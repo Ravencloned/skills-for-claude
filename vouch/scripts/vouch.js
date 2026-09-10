@@ -469,6 +469,8 @@ const PLACEHOLDER = /<[^>\n]{1,60}>/;
 function stripCode(s) {
   return String(s || '')
     .replace(/```[^\n]*\n([\s\S]*?)```/g, (m, body) => (/CLAIM:/i.test(body) && !PLACEHOLDER.test(body) ? '\n' + body + '\n' : ' '))
+    // blockquoted lines are quotations (a draft, a paste, someone else's words), not claims
+    .replace(/^[ \t]*>.*$/gm, ' ')
     .replace(/`[^`\n]*`/g, (m) => (/CLAIM:/i.test(m) && PLACEHOLDER.test(m) ? ' ' : m.slice(1, -1)))
     // a claim written as three lines (CLAIM: / RECEIPT: / WAGER:) is the same claim
     .replace(/\n\s*(?:[-*]\s*)?(RECEIPT|WAGER):/gi, ' | $1:');

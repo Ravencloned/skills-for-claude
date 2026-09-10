@@ -1,0 +1,63 @@
+TAP version 13
+# Subtest: basic
+ok 1 - basic
+  ---
+  duration_ms: 0.8621
+  type: 'test'
+  ...
+# Subtest: collapses punctuation
+ok 2 - collapses punctuation
+  ---
+  duration_ms: 0.1478
+  type: 'test'
+  ...
+# Subtest: trims edge hyphens
+ok 3 - trims edge hyphens
+  ---
+  duration_ms: 0.8103
+  type: 'test'
+  ...
+# Subtest: unicode is dropped
+ok 4 - unicode is dropped
+  ---
+  duration_ms: 0.1251
+  type: 'test'
+  ...
+# Subtest: underscores (wrong)
+not ok 5 - underscores (wrong)
+  ---
+  duration_ms: 0.9627
+  type: 'test'
+  location: 'C:\\Users\\Yash Nautiyal\\AppData\\Local\\Temp\\tmp.HGna1KHOXm\\test\\slug.test.js:8:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'hello-world'
+    - 'hello_world'
+            ^
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'hello_world'
+  actual: 'hello-world'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/Yash%20Nautiyal/AppData/Local/Temp/tmp.HGna1KHOXm/test/slug.test.js:8:42)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 4
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 89.0182

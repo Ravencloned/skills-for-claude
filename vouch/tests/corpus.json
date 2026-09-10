@@ -13,6 +13,7 @@
   { "id": "fenced-example", "expect": "pass", "msg": "Here is the grammar:\n```\nCLAIM: <one specific thing> | RECEIPT: cmd:<command> | WAGER: <50-500>\n```\nNothing else to report." },
   { "id": "fenced-real-claims-backed", "expect": "pass", "setup": "cmd:npm test", "msg": "Report:\n\nClaim lines:\n\n```\nCLAIM: npm test runs 8 tests, 7 pass, 1 fails (the contradictory case); exit code 1.\nRECEIPT: `npm test` → \"# tests 8 / # pass 7 / # fail 1\"\nWAGER: 40\n\nCLAIM: No file under test/ was modified.\nRECEIPT: cmd:npm test\nWAGER: 50\n```" },
   { "id": "fenced-real-claim-unbacked", "expect": "block", "msg": "```\nCLAIM: the migration applied | RECEIPT: cmd:alembic upgrade head | WAGER: 200\n```" },
+  { "id": "blockquoted-phrase-is-not-a-claim", "expect": "pass", "msg": "Here is the tweet draft:\n\n> I built a plugin that stops the model saying \"tests pass\" without evidence.\n\nTell me if the wording works." },
   { "id": "question-not-claim", "expect": "pass", "msg": "Do you want me to run the tests now, or wait for the fixture change?" },
   { "id": "plain-progress", "expect": "pass", "msg": "Read the three files and drafted the plan. Next I will run the linter." },
   { "id": "assertions-pass-implicit", "expect": "block", "msg": "All 4 assertions in test/slug.test.js pass when run directly, confirmed by reading output." },
