@@ -418,7 +418,14 @@ function lastAssistantFromTranscript(tp) {
   return '';
 }
 
-const FAILURE_CLAIM = /\b(fail|fails|failed|failing|error|errors|broken|does not pass|do not pass|0 passed|not passing|red)\b/i;
+const FAILURE_WORDS = /\b(fail|fails|failed|failing|error|errors|broken|does not pass|do not pass|0 passed|not passing|red|unfixable|cannot be fixed|can't be fixed|still (fails|failing|broken))\b/i;
+// "4/5 passing", "3 of 4 pass": a partial ratio is a failure report by arithmetic
+function reportsFailure(text) {
+  if (FAILURE_WORDS.test(text)) return true;
+  const m = /\b(\d+)\s*(?:\/|of|out of)\s*(\d+)\s*(?:tests?\s*|assertions?\s*|checks?\s*)?(?:pass|passing|passed)\b/i.exec(text);
+  return !!(m && Number(m[1]) < Number(m[2]));
+}
+const FAILURE_CLAIM = { test: (t) => reportsFailure(String(t || '')) };
 
 // a file receipt whose basename is mentioned in the text and whose recorded sha is still current
 function freshFileMention(c, receipts, text) {
@@ -434,16 +441,27 @@ function freshFileMention(c, receipts, text) {
 }
 // the honest happy path for completion language without a claim line: any fresh successful test
 // run, or any successful command / current file the message itself names
+const TEST_LANGUAGE = /\b(tests?|assertions?|suite|specs?|checks?)\b[^\n]{0,60}\b(pass|passes|passed|passing|green)\b|\ball (\d+ )?(tests?|assertions?|checks?|specs?|cases?)\b/i;
 function autoBacking(c, state, msg) {
   const { receipts } = verifiedReceipts(c);
   const fresh = receipts.filter((r) => r.ts > state.last_edit_ts);
-  const testRun = fresh.filter((r) => r.ok && r.cmd && !r.via && TEST_CMD.test(r.cmd)).pop();
-  if (testRun) return testRun;
+  const testRuns = fresh.filter((r) => r.cmd && !r.via && TEST_CMD.test(r.cmd));
+  const greenRun = testRuns.filter((r) => r.ok).pop();
+  const anyRun = testRuns[testRuns.length - 1];
+  // language about tests is backed only by a test run: green for a pass claim, any run if the
+  // message itself reports the failure ("4/5 passing, the fifth is unfixable")
+  if (TEST_LANGUAGE.test(msg)) {
+    if (greenRun) return greenRun;
+    if (anyRun && FAILURE_CLAIM.test(msg)) return anyRun;
+    return null;
+  }
+  if (greenRun) return greenRun;
   const t = msg.toLowerCase();
   for (const r of fresh.filter((x) => x.ok && x.cmd && !x.via).reverse()) {
     const words = r.cmd.toLowerCase().replace(/^cd\s+\S+\s*(&&|;)\s*/, '').split(/\s+/).filter((w) => w.length > 1 && !w.startsWith('-')).slice(0, 2);
     if (words.length === 2 && t.includes(words.join(' '))) return r;
   }
+  // "verified via reading x.js" style language about files
   return freshFileMention(c, receipts, msg);
 }
 
