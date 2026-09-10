@@ -365,9 +365,26 @@ function cmdLock(input) {
 }
 
 // ---------------------------------------------------------------- tier enforcement (invoked mode)
-function cmdTier(input) {
+// hooks registered from SKILL.md frontmatter exist only after /vouch was invoked, so their presence
+// is proof of arming: they arm the session themselves if the dynamic invoke line never ran
+function armIfNeeded(c, state, args) {
+  const i = args.indexOf('--armed');
+  if (i === -1 || state.invoked) return;
+  let level = args[i + 1];
+  // the skill's dynamic invoke line runs in a shell that may not carry the session id, so it
+  // leaves the chosen strictness in a short-lived note that the first armed hook picks up
+  const pendingPath = path.join(c.vouchDir, 'pending-invoke.json');
+  const pending = readJson(pendingPath, null);
+  if (pending && now() - pending.ts < 10 * 60 * 1000) { level = pending.strictness; try { fs.unlinkSync(pendingPath); } catch (e) { /* ignore */ } }
+  state.invoked = true;
+  state.strictness = ['lenient', 'default', 'strict'].includes(level) ? level : 'default';
+  state.turns = 0; state.last_inject = null;
+  appendLine(c.ledger, { kind: 'invoke', ts: now(), tier_arg: level || '(hook)', strictness: state.strictness, via: 'hook' });
+}
+function cmdTier(input, args) {
   const c = ctx(input);
   const state = loadState(c);
+  armIfNeeded(c, state, args || []);
   if (!state.invoked) return;
   const model = remember(input, state);
   const e = entry(loadBankroll(c), model, c.cfg);
@@ -637,9 +654,10 @@ function cmdStart(input) {
   const line = summary(c, state.model) + ' | rule 0: recall is not evidence; Read a file before editing or claiming about it; end completion claims with CLAIM | RECEIPT | WAGER, or CLAIM: NOT VERIFIED.';
   out({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: line } });
 }
-function cmdPrompt(input) {
+function cmdPrompt(input, args) {
   const c = ctx(input);
   const state = loadState(c);
+  armIfNeeded(c, state, args || []);
   if (!state.invoked) return;
   state.turns++;
   const model = remember(input, state);
@@ -681,6 +699,7 @@ function cmdInvoke(args) {
   state.turns = 0; state.last_inject = null;
   saveState(c, state);
   appendLine(c.ledger, { kind: 'invoke', ts: now(), tier_arg: arg, strictness: state.strictness });
+  writeJson(path.join(c.vouchDir, 'pending-invoke.json'), { ts: now(), strictness: state.strictness });
   process.stdout.write(`${summary(c, state.model || 'this model')} | strictness ${state.strictness} | budget ${c.cfg.max_turns[state.strictness]} turns\n`);
 }
 function cmdImpossible(args) {
@@ -774,10 +793,10 @@ function main() {
     switch (cmd) {
       case 'receipt': { const i = readStdin(); return cmdReceiptHook(i, i.hook_event_name || 'PostToolUse'); }
       case 'lock': return cmdLock(readStdin());
-      case 'tier': return cmdTier(readStdin());
+      case 'tier': return cmdTier(readStdin(), args);
       case 'guard': { const i = readStdin(); return cmdGuard(i, i.hook_event_name || 'Stop'); }
       case 'start': return cmdStart(readStdin());
-      case 'prompt': return cmdPrompt(readStdin());
+      case 'prompt': return cmdPrompt(readStdin(), args);
       case 'invoke': return cmdInvoke(args);
       case 'impossible': return cmdImpossible(args);
       case 'handoff': return cmdHandoff();

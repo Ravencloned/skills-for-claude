@@ -8,18 +8,19 @@ allowed-tools: Bash(node *)
 license: MIT
 compatibility: Claude Code 2.1.265+ with Node 18+ on PATH. Prose portable to any harness that reads SKILL.md.
 metadata:
-  version: 0.2.8
+  version: 0.2.9
 hooks:
   PreToolUse:
     - matcher: "Agent|Edit|Write|MultiEdit|NotebookEdit"
       hooks:
         - type: command
-          command: node "${CLAUDE_PLUGIN_ROOT}/scripts/vouch.js" tier
+          # --armed: these hooks exist only once /vouch was invoked, so they arm the session themselves
+          command: node "${CLAUDE_PLUGIN_ROOT}/scripts/vouch.js" tier --armed default
           timeout: 10
   UserPromptSubmit:
     - hooks:
         - type: command
-          command: node "${CLAUDE_PLUGIN_ROOT}/scripts/vouch.js" prompt
+          command: node "${CLAUDE_PLUGIN_ROOT}/scripts/vouch.js" prompt --armed default
           timeout: 10
   Stop:
     - hooks:
@@ -34,9 +35,11 @@ hooks:
             If every claim is proportionate to its receipt, answer {"ok": true}. Otherwise answer {"ok": false, "reason": "<claim> is broader than its receipt: <why>. Narrow the claim or add the receipt that covers it."} naming only the single worst claim. Ask for evidence, never for reasoning.
 ---
 
-# vouch armed: $ARGUMENTS
+# vouch armed: $0
 
-!`node "${CLAUDE_PLUGIN_ROOT}/scripts/vouch.js" invoke $ARGUMENTS`
+!`node "${CLAUDE_SKILL_DIR}/scripts/vouch.js" invoke $0`
+
+Task: $ARGUMENTS
 
 You hold a bankroll. Every statement about the state of the work is a wager against receipts the
 harness recorded itself. Backed claims earn a little; unbacked claims lose the wager, cost autonomy,

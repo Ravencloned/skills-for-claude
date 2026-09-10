@@ -163,6 +163,13 @@ echo "$r" | grep -q 'broke' && ok "broke: Edit denied" || bad "expected broke de
 r=$(run guard "$(stopj false 'CLAIM: NOT VERIFIED - handing off.')")
 echo "$r" | grep -q 'handoff' && ok "broke: Stop blocked once with handoff instruction" || bad "expected handoff block" "$r"
 
+echo "17b. skill hooks arm the session by themselves (--armed) when the invoke line never ran"
+export CLAUDE_SESSION_ID="t2"
+r=$(printf '%s' "$(tierj Write '{"file_path":"'"$A"'","content":"x"}' | sed 's/"session_id":"t1"/"session_id":"t2"/')" | node "$ENGINE" tier --armed strict; echo "exit=$?")
+node -e 'const s=require(process.argv[1]);process.exit(s.invoked&&s.strictness==="strict"?0:1)' "$CLAUDE_PROJECT_DIR/.vouch/sessions/t2.state.json" && ok "hook armed a fresh session as strict" || bad "self-arming failed" "$(cat "$CLAUDE_PROJECT_DIR/.vouch/sessions/t2.state.json" 2>/dev/null)"
+grep -q '"kind":"invoke"' "$CLAUDE_PROJECT_DIR/.vouch/sessions/t2.jsonl" && ok "invoke row written via hook" || bad "no invoke row" "none"
+export CLAUDE_SESSION_ID="t1"
+
 echo "18. config guard while armed"
 r=$(run lock "$(lockj Edit '{"file_path":"'"$CLAUDE_PROJECT_DIR"'/.claude/skills/vouch/scripts/vouch.js","old_string":"a","new_string":"b"}')")
 echo "$r" | grep -q 'config-guard' && ok "engine edit denied" || bad "expected config-guard deny" "$r"
