@@ -65,6 +65,13 @@ node -e 'const s=require(process.argv[1]);process.exit(s.last_edit_ts>0?0:1)' "$
 r=$(run lock "$(lockj Bash '{"command":"echo x > '"$TD$TS"'/a.test.js"}')")
 echo "$r" | grep -q 'test-protect' && ok "shell overwrite of a test file denied" || bad "expected test-protect deny" "$r"
 
+echo "2d. write-then-check in ONE command: the check counts as after the edit"
+run receipt "$(receiptj PostToolUse Bash '{"command":"cat src/c.js"}')" >/dev/null
+printf 'export const c = 3;\n' > "$CLAUDE_PROJECT_DIR/src/c.js"
+run receipt "$(receiptj PostToolUse Bash '{"command":"cat > src/c.js <<EOF\nexport const c = 3;\nEOF\nnpm test"}')" >/dev/null
+r=$(run guard "$(stopj false 'CLAIM: tests pass after the rewrite of c.js | RECEIPT: cmd:npm test | WAGER: 100')")
+echo "$r" | grep -q 'BEFORE your latest edit' && bad "same-command check must not be stale" "$r" || ok "check in the same command as the write is fresh"
+
 echo "3. file changed after read -> deny"
 printf 'export const a = 2;\n' > "$A"
 r=$(run lock "$(lockj Edit '{"file_path":"'"$A"'","old_string":"2","new_string":"3"}')")

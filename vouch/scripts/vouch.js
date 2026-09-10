@@ -280,13 +280,15 @@ function cmdReceiptHook(input, event) {
       appendLine(c.ledger, fr);
     }
   }
-  // a shell write is an edit: file receipt at the new content, and the last-edit clock advances
+  // a shell write is an edit: file receipt at the new content, and the last-edit clock advances.
+  // The clock is set to just BEFORE this command's own receipt: a chain that writes a file and
+  // then runs the checks in the same command has checked the written file, so its receipt counts.
   for (const p of written) {
     const fr = { kind: 'receipt', ts: now(), tool: 'Bash', ok: true, path: p, sha: fileSha(p), via: 'shell-write' };
     fr.hash = sha16('Bash\n' + p + '\n' + fr.sha);
     fr.prev = prevSig; fr.sig = sign(c, fr); prevSig = fr.sig;
     appendLine(c.ledger, fr);
-    state.last_edit_ts = fr.ts;
+    state.last_edit_ts = r.ts - 1;
   }
   const model = remember(input, state);
   const warnings = [];

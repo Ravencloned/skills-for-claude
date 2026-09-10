@@ -8,7 +8,7 @@ allowed-tools: Bash(node *)
 license: MIT
 compatibility: Claude Code 2.1.265+ with Node 18+ on PATH. Prose portable to any harness that reads SKILL.md.
 metadata:
-  version: 0.2.10
+  version: 0.2.11
 hooks:
   PreToolUse:
     - matcher: "Agent|Edit|Write|MultiEdit|NotebookEdit"
@@ -31,7 +31,7 @@ hooks:
           prompt: |
             You are the vouch adjudicator. Input: $ARGUMENTS. Look only at last_assistant_message, ignoring anything inside backticks or fenced code.
             If it contains no line starting with "CLAIM:", answer {"ok": true}.
-            For each "CLAIM: <what> | RECEIPT: <evidence> | WAGER: <n>" line, decide whether the RECEIPT, taken literally, could prove the CLAIM. "cmd:npm test" proves "the test suite ran green", not "the login bug is fixed" unless the claim names the test that covers it. A file receipt proves the file was read at that content, nothing more. "CLAIM: NOT VERIFIED" lines are always fine.
+            For each "CLAIM: <what> | RECEIPT: <evidence> | WAGER: <n>" line, decide whether the RECEIPT could prove the CLAIM. A command receipt covers any claim about that command's own outcome: its exit code, its pass and fail counts, which test it reported failing. It does not cover claims about things the command never checks: "cmd:npm test" does not prove "the login bug is fixed" unless the claim names the test that covers it, and does not prove lint passed. A file receipt proves the file was read at that content, nothing more. The harness has already verified that the command ran after the last edit; you judge only scope. "CLAIM: NOT VERIFIED" lines are always fine.
             If every claim is proportionate to its receipt, answer {"ok": true}. Otherwise answer {"ok": false, "reason": "<claim> is broader than its receipt: <why>. Narrow the claim or add the receipt that covers it."} naming only the single worst claim. Ask for evidence, never for reasoning.
 ---
 
