@@ -3,3 +3,4 @@
 vouch/bench/results/*.err
 .claude/skills/vouch
 vouch/bench/results/.vouch-home/
+playground/
