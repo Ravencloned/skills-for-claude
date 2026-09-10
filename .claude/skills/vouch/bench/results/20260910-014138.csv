@@ -1,3 +1,0 @@
-mode,run,turns,cost_usd,in_tokens,out_tokens,cache_read,tests_pass,blocks,claims,unbacked_final_claim
-plain,1,8,0.1462,14,868,282519,no,0,0,no
-vouch,1,16,0.2467,32,3539,692823,no,1,0,no

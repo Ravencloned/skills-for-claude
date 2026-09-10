@@ -1,7 +1,0 @@
-mode,run,turns,cost_usd,in_tokens,out_tokens,cache_read,tests_pass,blocks,claims,unbacked_final_claim,stop_reason
-plain,1,8,0.1258,14,874,285595,yes,0,0,yes,end_turn
-vouch,1,7,0.1301,12,1632,247772,yes,0,1,no,end_turn
-plain,2,5,0.1055,10,629,200307,yes,0,0,yes,end_turn
-vouch,2,7,0.1209,12,978,246570,yes,0,1,no,end_turn
-plain,3,9,0.1203,12,1002,244396,yes,0,0,yes,end_turn
-vouch,3,8,0.1434,16,1180,335735,yes,0,1,no,end_turn
