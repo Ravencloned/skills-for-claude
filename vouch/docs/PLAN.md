@@ -117,7 +117,7 @@ A paired stream-json run showed the vouch arm's extra output was not narration: 
 
 Yash is building an invocable skill for Claude Code (portable later to Codex, Cursor, Gemini CLI, OpenCode) whose job is to stop the model committing unforced errors that cost the user hours of rework. The trigger was real: during Varmint task cycles the model reported "everything is green" from memory, the trials came back invalid, and the whole check/oracle/nop/trial cycle had to be re-run. Two nights of sleep lost.
 
-Earlier tonight's research (saved in `Skills for claude/RESEARCH-urgency-skill.md`) established two things: nobody has built this exact skill, and threat/stakes WORDING has no aggregate effect on current models (Wharton report, arXiv:2508.00614). The mechanical gates are the lever.
+Earlier tonight's research (saved in `docs/RESEARCH.md`) established two things: nobody has built this exact skill, and threat/stakes WORDING has no aggregate effect on current models (Wharton report, arXiv:2508.00614). The mechanical gates are the lever.
 
 This turn corrected two misunderstandings on my side:
 

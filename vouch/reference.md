@@ -1,13 +1,13 @@
 # vouch reference: every rule, its evidence, or its label as a hypothesis
 
 Research sweep 2026-09-09 (nine passes: literature, harness docs, GitHub). Full notes in
-`PLAN-vouch.md` at the repo root. Numbers are as reported by the cited papers.
+`docs/PLAN.md`. Numbers are as reported by the cited papers.
 
 ## The frame: correction, interruption, attribution, gating
 
 | claim | source |
 |---|---|
-| "Punishing" a stateless deployed model in-session is a category error; the enforceable surfaces are detect the error, correct or interrupt the output, attribute and log it, gate downstream actions | threat-model analysis of open-weight enforcement surfaces, 2026 (see PLAN-vouch.md, "Research connection") |
+| "Punishing" a stateless deployed model in-session is a category error; the enforceable surfaces are detect the error, correct or interrupt the output, attribute and log it, gate downstream actions | threat-model analysis of open-weight enforcement surfaces, 2026 (see docs/PLAN.md, "Research connection") |
 | Post-training persists hallucination because binary scoring rewards guessing over abstention; the fix is a scoreboard that penalizes confident errors more than "I don't know" | Kalai, Nachum, Vempala, Zhang, "Why Language Models Hallucinate", arXiv:2509.04664 (the NOT VERIFIED credit is that scoreboard at the harness level) |
 | Agent identifiers, real-time monitoring, and tamper-evident activity logging are the accountability infrastructure that links an action to an agent | Chan et al., "Visibility into AI Agents", arXiv:2401.13138 (the hash-chained receipt ledger) |
 | Every software-layer safeguard the operator controls is strippable; only what is below the software layer or outside it survives | same threat-model analysis; vouch works because the user, not the model, owns the hooks (config guard enforces it) |
