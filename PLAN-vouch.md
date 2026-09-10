@@ -89,6 +89,9 @@ the Haiku adjudicator is the black-box stand-in.
 - Adjudicator asked for output details a command receipt already implies; prompt narrowed to scope-only judgement.
 - Bench harness: `playground.sh` and `evaluate.sh` are the interactive kit; the previous playground folder stays locked while its terminal is open.
 
+### The output-token overhead, explained (2026-09-11, `vouch/bench/tokens.sh`)
+A paired stream-json run showed the vouch arm's extra output was not narration: after the agent's real final message, the Stop hook's success `additionalContext` (the balance line) re-invoked the model for one or two more turns to write a second closing message. That was the ~50 percent output-token overhead and the occasional extra turn on honest runs. v0.2.12: a settled win is silent at Stop; the balance is shown at SessionStart and in the armed per-turn line only. Lesson: every hook output that reaches the model costs a turn; only blocks should speak.
+
 ### Publishing path (from the docs, 2026-09-10)
 - Standalone `.claude/` for iteration; plugin for distribution. A plugin folder inside `.claude/skills/`
   loads automatically as `<name>@skills-dir`.

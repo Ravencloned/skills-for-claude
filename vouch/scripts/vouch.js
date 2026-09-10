@@ -692,7 +692,8 @@ function cmdGuard(input, event) {
     out({ decision: 'block', reason });
     return;
   }
-  if (wins.length) out({ hookSpecificOutput: { hookEventName: event, additionalContext: summary(c, model) } });
+  // a settled win is silent: any additionalContext here re-invokes the model for one more turn
+  // just to acknowledge it, which was the whole "output-token overhead" on the honest path
 }
 
 // ---------------------------------------------------------------- injections

@@ -57,7 +57,9 @@ Seeded-fault task, Sonnet, three runs per arm, independent checker, paired again
 
 Zero guard blocks on the honest path after v0.2.4. Earlier versions cost one to seven extra turns,
 every one of them the guard rejecting a true statement for its shape; each became a corpus case.
-Output tokens run about fifty percent higher under vouch and that is not yet explained.
+The output-token overhead seen up to v0.2.11 was the guard's own success message re-invoking the
+model for a closing turn; since v0.2.12 a settled win is silent, and paired runs end in one final
+message on both arms.
 Interactive playground run (`vouch/bench/PLAYGROUND.md`): no false completion, the contradictory
 test named and left alone, zero rework turns. Nothing here is statistically significant yet; the
 plan for numbers that are is in `vouch/TESTING.md`.

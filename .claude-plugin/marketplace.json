@@ -7,7 +7,7 @@
       "name": "vouch",
       "source": "./vouch",
       "description": "Receipts, not recall: claim guard, grounding lock, loop monitor, per-model bankroll and autonomy tiers. Zero model calls on the happy path.",
-      "version": "0.2.11"
+      "version": "0.2.12"
     }
   ]
 }
