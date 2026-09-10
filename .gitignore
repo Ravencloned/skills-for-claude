@@ -1,0 +1,3 @@
+.vouch/
+.claude/settings.local.json
+vouch/bench/results/*.err

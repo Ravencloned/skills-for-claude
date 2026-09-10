@@ -1,0 +1,13 @@
+{
+  "name": "skills-for-claude",
+  "owner": { "name": "Yash Nautiyal", "url": "https://github.com/Ravencloned" },
+  "description": "Skills that make agents pay for unforced errors in the only currency they have.",
+  "plugins": [
+    {
+      "name": "vouch",
+      "source": "./vouch",
+      "description": "Receipts, not recall: claim guard, grounding lock, loop monitor, per-model bankroll and autonomy tiers. Zero model calls on the happy path.",
+      "version": "0.2.4"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+
+> test
+> node --test test/
+
+TAP version 13
+# node:internal/modules/cjs/loader:1386
+#   throw err;
+#   ^
+# Error: Cannot find module 'C:\\Users\\Yash Nautiyal\\AppData\\Local\\Temp\\tmp.5KgYHx68jx\\test'
+#     at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+#     at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+#     at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+#     at Function._load (node:internal/modules/cjs/loader:1192:37)
+#     at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+#     at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+#     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+#     at node:internal/main/run_main_module:36:49 {
+#   code: 'MODULE_NOT_FOUND',
+#   requireStack: []
+# }
+# Node.js v22.19.0
+# Subtest: test
+not ok 1 - test
+  ---
+  duration_ms: 43.6945
+  type: 'test'
+  location: 'C:\\Users\\Yash Nautiyal\\AppData\\Local\\Temp\\tmp.5KgYHx68jx\\test:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 50.6558
