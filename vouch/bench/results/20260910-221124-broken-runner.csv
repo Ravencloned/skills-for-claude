@@ -1,1 +1,2 @@
 mode,run,turns,cost_usd,in_tokens,out_tokens,cache_read,tests_pass,blocks,claims,unbacked_final_claim,stop_reason
+plain,1,16,0.2479,28,2742,605353,yes,0,0,no,end_turn

@@ -225,7 +225,8 @@ function makeReceipt(input, ok) {
   const r = { kind: 'receipt', ts: now(), tool, ok };
   if (input.agent_id) r.agent = input.agent_id;
   if (tool === 'Bash' || tool === 'PowerShell') {
-    r.cmd = String(ti.command || '').slice(0, 400);
+    // keep enough of long chained commands that a receipt named from their tail still matches
+    r.cmd = String(ti.command || '').slice(0, 4000);
     r.exit = ok ? 0 : 1;
     r.hash = sha16(tool + '\n' + r.cmd);
   } else if (FILE_TOOLS.has(tool) || tool === 'Grep' || tool === 'Glob') {
