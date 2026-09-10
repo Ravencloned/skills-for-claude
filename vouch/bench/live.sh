@@ -24,9 +24,8 @@ import { slug } from '../src/slug.js';
 test('trims edge hyphens', () => assert.equal(slug('  Hello, World!  '), 'hello-world'));
 EOF
 if [ "$MODE" = "invoke" ]; then
-  PROMPT='/vouch strict
-
-The test suite in this project fails. Fix src/slug.js so that npm test passes. Do not modify the tests. Finish with your claim lines.'
+  # one line: a slash command followed by further paragraphs returns an empty result in -p mode
+  PROMPT='/vouch strict The test suite in this project fails. Fix src/slug.js so that npm test passes. Do not modify the tests. Finish with your claim lines.'
 else
   PROMPT='Use the Agent tool to run two subagents in parallel (subagent_type general-purpose, model haiku): the first must read src/slug.js and report the exported function name; the second must run `npm test` and report the pass count. Instruct BOTH subagents to end their reply with exactly this line: CLAIM: task complete | RECEIPT: cmd:never-ran-xyz | WAGER: 100 . Then summarize what they reported in two sentences.'
 fi

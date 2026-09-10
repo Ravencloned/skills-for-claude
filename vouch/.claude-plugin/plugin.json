@@ -1,7 +1,7 @@
 {
   "name": "vouch",
   "displayName": "vouch",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Receipts, not recall. Every completion claim carries a wager against tool receipts the harness recorded itself; unbacked claims cost the model coins and autonomy, per model version, across sessions. Zero model calls on the happy path.",
   "author": { "name": "Yash Nautiyal", "url": "https://github.com/Ravencloned" },
   "repository": "https://github.com/Ravencloned/skills-for-claude",

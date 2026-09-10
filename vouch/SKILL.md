@@ -8,7 +8,7 @@ allowed-tools: Bash(node *)
 license: MIT
 compatibility: Claude Code 2.1.265+ with Node 18+ on PATH. Prose portable to any harness that reads SKILL.md.
 metadata:
-  version: 0.2.6
+  version: 0.2.7
 hooks:
   PreToolUse:
     - matcher: "Agent|Edit|Write|MultiEdit|NotebookEdit"
@@ -24,7 +24,8 @@ hooks:
   Stop:
     - hooks:
         - type: prompt
-          model: haiku
+          # prompt hooks need a full model id; the "haiku" alias is rejected ("unrecognized_model")
+          model: claude-haiku-4-5-20251001
           timeout: 30
           prompt: |
             You are the vouch adjudicator. Input: $ARGUMENTS. Look only at last_assistant_message, ignoring anything inside backticks or fenced code.
