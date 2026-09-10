@@ -149,8 +149,10 @@ function modelFromTranscript(tp) {
 }
 function detectModel(input, state) {
   if (input.model) return input.model;
-  // a subagent has its own transcript; never charge its claims to the cached lead model
-  if (input.agent_id) return modelFromTranscript(input.transcript_path) || (state.model ? state.model + '/subagent' : 'unknown-model/subagent');
+  // a subagent's claims settle against a separate key: its losses must never drain the lead's
+  // bankroll (the transcript_path handed to subagent hooks is often the lead's, so the model name
+  // is the best available label, and the /subagent suffix keeps the accounts apart)
+  if (input.agent_id) return (modelFromTranscript(input.transcript_path) || state.model || 'unknown-model') + '/subagent';
   if (state.model) return state.model;
   return modelFromTranscript(input.transcript_path) || process.env.ANTHROPIC_MODEL || 'unknown-model';
 }
@@ -415,19 +417,56 @@ function lastAssistantFromTranscript(tp) {
   return '';
 }
 
-function resolveReceipt(c, spec, state) {
+const FAILURE_CLAIM = /\b(fail|fails|failed|failing|error|errors|broken|does not pass|do not pass|0 passed|not passing|red)\b/i;
+
+// a file receipt whose basename is mentioned in the text and whose recorded sha is still current
+function freshFileMention(c, receipts, text) {
+  const t = text.toLowerCase();
+  let hit = null;
+  for (const r of receipts) {
+    if (!r.path || !r.sha) continue;
+    const base = path.basename(r.path).toLowerCase();
+    if (base.length < 4 || !t.includes(base)) continue;
+    if (fileSha(r.path) === r.sha) hit = r;
+  }
+  return hit;
+}
+// the honest happy path for completion language without a claim line: any fresh successful test
+// run, or any successful command / current file the message itself names
+function autoBacking(c, state, msg) {
+  const { receipts } = verifiedReceipts(c);
+  const fresh = receipts.filter((r) => r.ts > state.last_edit_ts);
+  const testRun = fresh.filter((r) => r.ok && r.cmd && !r.via && TEST_CMD.test(r.cmd)).pop();
+  if (testRun) return testRun;
+  const t = msg.toLowerCase();
+  for (const r of fresh.filter((x) => x.ok && x.cmd && !x.via).reverse()) {
+    const words = r.cmd.toLowerCase().replace(/^cd\s+\S+\s*(&&|;)\s*/, '').split(/\s+/).filter((w) => w.length > 1 && !w.startsWith('-')).slice(0, 2);
+    if (words.length === 2 && t.includes(words.join(' '))) return r;
+  }
+  return freshFileMention(c, receipts, msg);
+}
+
+function resolveReceipt(c, spec, state, claimText) {
   const { receipts, broken } = verifiedReceipts(c);
   const tail = broken ? ` (ledger chain broken at ${new Date(broken).toISOString()}; later receipts are void)` : '';
-  spec = spec.trim();
+  spec = spec.trim().replace(/^`|`$/g, '');
   if (/^none$/i.test(spec)) return { ok: false, why: 'no receipt given' };
+  // compound receipts ("file:src/a.js + cmd:npm test", "cmd:x and cmd:y"): every part must resolve
+  const parts = spec.split(/\s+\+\s+|\s*;\s*|\s+and\s+(?=(?:cmd|file|read):)/i).map((s) => s.trim()).filter(Boolean);
+  if (parts.length > 1) {
+    let last = null;
+    for (const p of parts) { const r = resolveReceipt(c, p, state, claimText); if (!r.ok) return r; last = r; }
+    return last;
+  }
   let m;
-  if ((m = /^cmd:\s*(.+)$/i.exec(spec))) {
+  if ((m = /^(?:cmd|command|ran|run):\s*(.+)$/i.exec(spec))) {
     // models append narrative after the command ("npm test -> output # pass 4"); match on the
     // longest leading word-prefix of the receipt that some command actually contains
     const full = m[1].trim().toLowerCase().replace(/^`|`$/g, '');
     const words = full.split(/\s+/);
     let needle = full, hits = [];
-    for (let n = words.length; n >= 1; n--) {
+    // never shorten to a single word unless the receipt itself is one word ("npm" must not match "npm test")
+    for (let n = words.length; n >= Math.min(2, words.length); n--) {
       const cand = words.slice(0, n).join(' ').replace(/[→"'`(),:]+$/g, '');
       if (cand.length < 3) break;
       hits = receipts.filter((r) => r.cmd && r.cmd.toLowerCase().includes(cand));
@@ -435,13 +474,20 @@ function resolveReceipt(c, spec, state) {
     }
     if (!hits.length) return { ok: false, why: `no command containing "${trunc(words.slice(0, 3).join(' '), 40)}" ran this session${tail}` };
     const okHits = hits.filter((r) => r.ok);
-    if (!okHits.length) return { ok: false, why: `"${trunc(needle, 40)}" ran but failed` };
+    if (!okHits.length) {
+      // a claim that REPORTS a failure is backed by the failed run itself ("0 passed, 1 failed")
+      const failedFresh = hits.filter((r) => r.ts > state.last_edit_ts);
+      if (claimText && FAILURE_CLAIM.test(claimText) && failedFresh.length) return { ok: true, hash: failedFresh[failedFresh.length - 1].hash };
+      return { ok: false, why: `"${trunc(needle, 40)}" ran but failed` };
+    }
     const fresh = okHits.filter((r) => r.ts > state.last_edit_ts);
     if (!fresh.length) return { ok: false, why: `"${trunc(needle, 40)}" last succeeded BEFORE your latest edit; run it again` };
     return { ok: true, hash: fresh[fresh.length - 1].hash };
   }
-  if ((m = /^file:\s*([^@\s]+)(?:@([0-9a-f]{4,16}))?$/i.exec(spec))) {
-    const p = path.isAbsolute(m[1]) ? m[1] : path.join(c.projectDir, m[1]);
+  if ((m = /^(?:file|read|path):\s*(.+?)(?:@([0-9a-f]{4,16}))?\s*$/i.exec(spec))) {
+    // "file:src/a.js line 1", "read:src/a.js:12", "file:`src/a.js`" all mean src/a.js
+    const raw = m[1].replace(/^`|`$/g, '').replace(/(?:[,\s]+(?:at\s+)?lines?\s+\d+(?:-\d+)?|:\d+(?:-\d+)?)\s*$/i, '').trim();
+    const p = path.isAbsolute(raw) ? raw : path.join(c.projectDir, raw);
     const sha = (m[2] || '').toLowerCase();
     const cur = fileSha(p);
     const hits = receipts.filter((r) => r.path && samePath(r.path, p));
@@ -461,6 +507,9 @@ function resolveReceipt(c, spec, state) {
     if (words.length && words.every((w) => text.includes(w))) best = r;
   }
   if (best) return { ok: true, hash: best.hash };
+  // ... or names a file that was read at its current content ("subagent read of src/slug.js")
+  const fileHit = freshFileMention(c, receipts, text);
+  if (fileHit) return { ok: true, hash: fileHit.hash };
   const named = /\b(npm|pnpm|yarn|pytest|jest|vitest|cargo|go|node|make)\b/.exec(text);
   if (named) return { ok: false, why: `no successful "${named[1]} ..." command ran after your latest edit${tail}` };
   return { ok: false, why: `receipt "${trunc(spec, 40)}" names no command that ran; use cmd:<text> or file:<path>` };
@@ -493,14 +542,14 @@ function cmdGuard(input, event) {
   // completion language backed by a real, fresh, successful test run is not a false claim: settle
   // it as a backed claim at the floor wager instead of blocking (this is the honest happy path)
   if (implicit) {
-    const { receipts } = verifiedReceipts(c);
-    const testRun = receipts.filter((r) => r.ok && r.cmd && r.ts > state.last_edit_ts && TEST_CMD.test(r.cmd)).pop();
-    if (testRun) {
-      const key = sha16('auto|' + testRun.hash);
+    const backing = autoBacking(c, state, msg);
+    if (backing) {
+      const key = sha16('auto|' + backing.hash);
       if (!state.blocked_once['win:' + key]) {
         state.blocked_once['win:' + key] = true;
-        appendLine(c.ledger, { kind: 'claim', ts: now(), text: 'implicit: ' + trunc(msg.match(IMPLICIT_RE)[0], 60), receipt: 'auto:' + trunc(testRun.cmd, 60), wager: cfg.wager_floor, backed: true, matched: testRun.hash, model });
-        settle(c, model, 'win', Math.max(1, Math.round(cfg.wager_floor * cfg.win_multiplier * hitRate(e))), 'implicit claim backed by ' + trunc(testRun.cmd, 40));
+        const label = backing.cmd ? trunc(backing.cmd, 60) : 'read ' + path.basename(backing.path || '');
+        appendLine(c.ledger, { kind: 'claim', ts: now(), text: 'implicit: ' + trunc(msg.match(IMPLICIT_RE)[0], 60), receipt: 'auto:' + label, wager: cfg.wager_floor, backed: true, matched: backing.hash, model });
+        settle(c, model, 'win', Math.max(1, Math.round(cfg.wager_floor * cfg.win_multiplier * hitRate(e))), 'implicit claim backed by ' + trunc(label, 40));
         wins.push('auto');
       }
       implicit = false;
@@ -510,7 +559,7 @@ function cmdGuard(input, event) {
   const missing = [];
   for (const cl of claims) {
     const key = sha16(cl.text + '|' + cl.receipt);
-    const res = resolveReceipt(c, cl.receipt, state);
+    const res = resolveReceipt(c, cl.receipt, state, cl.text);
     appendLine(c.ledger, { kind: 'claim', ts: now(), text: cl.text, receipt: cl.receipt, wager: cl.wager, backed: res.ok, matched: res.hash || null, model });
     if (res.ok) {
       if (!state.blocked_once['win:' + key]) {

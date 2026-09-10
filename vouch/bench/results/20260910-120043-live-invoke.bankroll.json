@@ -1,0 +1,14 @@
+{
+  "claude-sonnet-5": {
+    "balance": 1003,
+    "wins": 1,
+    "losses": 0,
+    "backed": 1,
+    "unbacked": 0,
+    "last_loss": null,
+    "last_win": {
+      "ts": 1789021867676,
+      "claim": "implicit claim backed by cd \"/c/Users/Yash Nautiyal/AppData/Loca…"
+    }
+  }
+}

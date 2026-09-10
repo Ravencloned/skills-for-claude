@@ -14,6 +14,13 @@ for (const c of corpus) {
   if (c.setup && c.setup.startsWith('cmd:')) {
     execFileSync('node', [engine, 'receipt'], { input: JSON.stringify({ session_id: sid, cwd: proj, hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_use_id: 's-' + sid, tool_input: { command: c.setup.slice(4) }, tool_response: {} }), env });
   }
+  if (c.setup && c.setup.startsWith('read:')) {
+    const fp = require('path').join(proj, c.setup.slice(5));
+    execFileSync('node', [engine, 'receipt'], { input: JSON.stringify({ session_id: sid, cwd: proj, hook_event_name: 'PostToolUse', tool_name: 'Read', tool_use_id: 'r-' + sid, tool_input: { file_path: fp }, tool_response: {} }), env });
+  }
+  if (c.setup && c.setup.startsWith('failcmd:')) {
+    execFileSync('node', [engine, 'receipt'], { input: JSON.stringify({ session_id: sid, cwd: proj, hook_event_name: 'PostToolUseFailure', tool_name: 'Bash', tool_use_id: 'f-' + sid, tool_input: { command: c.setup.slice(8) }, tool_response: { stderr: 'fail' } }), env });
+  }
   const inp = { session_id: sid, cwd: proj, hook_event_name: c.event || 'Stop', stop_hook_active: false, last_assistant_message: c.msg };
   if (c.event === 'SubagentStop') { inp.agent_id = 'agx'; inp.agent_type = 'general-purpose'; }
   const outp = execFileSync('node', [engine, 'guard'], { input: JSON.stringify(inp), env }).toString();

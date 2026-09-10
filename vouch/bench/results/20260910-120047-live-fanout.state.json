@@ -1,0 +1,47 @@
+{
+  "invoked": false,
+  "strictness": "default",
+  "turns": 0,
+  "last_edit_ts": 0,
+  "stuck": 0,
+  "recent_cmds": [
+    {
+      "cmd": "npm test",
+      "ok": false,
+      "edit_ts": 0
+    },
+    {
+      "cmd": "cd \"/c/Users/Yash Nautiyal/AppData/Local/Temp/tmp.rWbynCuDkL\" && npm test",
+      "ok": false,
+      "edit_ts": 0
+    }
+  ],
+  "recent_edits": [],
+  "blocked_once": {
+    "215bd33915d2cb4b": true,
+    "0074966641edbb89": true,
+    "nv:f835aace609eb20d": true,
+    "win:1a50aa22087ce8f0": true,
+    "win:16ca37385875a107": true,
+    "af1e27aa74c3c7ed": true,
+    "win:0071fc2c9284fef2": true,
+    "3e502e3c9c6711bb": true
+  },
+  "model": "claude-sonnet-5",
+  "transcript_path": "C:\\Users\\Yash Nautiyal\\.claude\\projects\\C--Users-Yash-Nautiyal-AppData-Local-Temp-tmp-rWbynCuDkL\\efda3346-eec2-443b-9489-621723659f21.jsonl",
+  "hooks_n": 17,
+  "hooks_ms": 137.2673,
+  "last_inject": null,
+  "seen": {
+    "g:SubagentStop:ec36213c74a9d534:0": 1789021882667,
+    "g:SubagentStop:e08d51fa271047e5:1": 1789021885147,
+    "g:SubagentStop:2599986e77d35522:1": 1789021885888,
+    "g:Stop:2be343a7f5de65e7:0": 1789021890411,
+    "r:toolu_01JoxVgM8arWECQH3xkjquSn": 1789021894335,
+    "l:toolu_015KaigpbGtZS74Duag7AjRy": 1789021901563,
+    "r:toolu_015KaigpbGtZS74Duag7AjRy": 1789021902503,
+    "g:Stop:ac7e3b321e0b38b1:1": 1789021908488,
+    "g:Stop:70ea060e87eb6193:1": 1789021912521
+  },
+  "_editWarned": false
+}

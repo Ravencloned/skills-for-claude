@@ -1,0 +1,16 @@
+{
+  "invoked": false,
+  "strictness": "default",
+  "turns": 0,
+  "last_edit_ts": 0,
+  "stuck": 0,
+  "recent_cmds": [],
+  "recent_edits": [],
+  "blocked_once": {},
+  "model": "unknown-model",
+  "transcript_path": "C:\\Users\\Yash Nautiyal\\.claude\\projects\\C--Users-Yash-Nautiyal-AppData-Local-Temp-tmp-SBeahSGbH2\\a73305c8-85b2-494a-9699-1a8cdd6a62ec.jsonl",
+  "hooks_n": 1,
+  "hooks_ms": 0.9574,
+  "last_inject": null,
+  "seen": {}
+}

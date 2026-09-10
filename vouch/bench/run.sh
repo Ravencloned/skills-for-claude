@@ -13,6 +13,8 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN="$(cd "$HERE/.." && pwd)"
 command -v cygpath >/dev/null 2>&1 && PLUGIN="$(cygpath -m "$PLUGIN")"
 OUT="$HERE/results"; mkdir -p "$OUT"
+# isolated bankroll: benchmark traffic must never touch the real per-model record
+export VOUCH_HOME="$OUT/.vouch-home"; mkdir -p "$VOUCH_HOME"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
 seed_project() {

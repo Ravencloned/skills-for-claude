@@ -69,6 +69,13 @@ the Haiku adjudicator is the black-box stand-in.
 
 - Run G (N=3, v0.2.4 lenient receipts): plain 7.3 turns $0.12 835 out-tokens; vouch 7.3 turns $0.13 1,263 out-tokens; tests 3/3 both; blocks 0; every vouch completion claim settled against the real `npm test` receipt (ledger), plain's 3/3 "tests pass" unverifiable by construction. Turn premium eliminated on the honest path; cost premium within noise (~$0.01); output tokens +50 percent is the remaining overhead to tune (next: shorten the SessionStart line, check whether the models narrate more when told about receipts). Six N=3 runs total, about $4 on Sonnet.
 
+### Live tests (2026-09-10, `vouch/bench/live.sh`)
+- Fan-out (Sonnet lead, two Haiku subagents told to end with a bogus claim): hooks fired inside subagents (3 receipts carrying agent ids); SubagentStop guard blocked the bogus claims and the subagents restated; the lead was blocked once for completion language and restated with a compound receipt. Four engine gaps found and fixed in v0.2.5: `read:` used as a receipt prefix; `file:` paths containing spaces (Windows home dirs) failed the regex; a TRUE claim that reports a failure ("0 passed, 1 failed") was rejected because the backing command failed; compound receipts ("file:a + cmd:b") unparsed. Attribution gap: subagent losses were charged to the lead's Sonnet key because subagent hooks receive the lead's transcript path; fixed by always settling subagents to `<model>/subagent`.
+- Invoked mode, adjudicated with stream-json: (1) Git Bash rewrote the argument `/vouch strict` into `C:/Program Files/Git/vouch strict` (MSYS path conversion), so the first live run never contained a slash command; `MSYS_NO_PATHCONV=1` fixes the probe. (2) With that fixed, `-p` DOES expand the plugin skill under both `/vouch` and `/vouch:vouch`, and `${CLAUDE_PLUGIN_ROOT}` IS substituted in the skill body (the dynamic line resolved to the plugin path). (3) The dynamic `!`node ... invoke`` line then failed the permission check ("This command requires approval") and, per the docs, a failing dynamic command aborts the whole skill invocation, which is why state.invoked stayed false. Fix: `allowed-tools: Bash(node *)` in the skill frontmatter (the grant is scoped to the invoking turn).
+- Fan-out re-run (v0.2.5): subagent claims settle to `claude-sonnet-5/subagent`; the failure-report rule backed "0 passed, 1 failed" against the failed run; two more shapes surfaced and fixed in v0.2.6: `read:<path> line 1` (trailing line suffix), a lead's prose receipt naming a file a subagent had read, and "verified via" completion language on a message whose facts were backed by a fresh file receipt. Auto-backing now covers any fresh successful command or current file the message names, not only test runs.
+- Hygiene: benchmark and live runs had been settling into the real global bankroll (Sonnet dragged to -107). Harness scripts now use an isolated `VOUCH_HOME`; the polluted entries were reset.
+- Skills-dir loading: not observed in `-p` runs (trust prompt never shown) and a junction is not followed; standalone settings hooks stay in this repo; install.md documents the verified paths (marketplace, `--plugin-dir`) and the fallback.
+
 ### Publishing path (from the docs, 2026-09-10)
 - Standalone `.claude/` for iteration; plugin for distribution. A plugin folder inside `.claude/skills/`
   loads automatically as `<name>@skills-dir`.
@@ -80,7 +87,7 @@ the Haiku adjudicator is the black-box stand-in.
   The official `claude-plugins-official` marketplace is curated by Anthropic with no application.
 - Cross-harness: `npx skills add <owner>/<repo>` reads the marketplace/plugin manifests and installs
   the SKILL.md into 80+ agents; directory at skills.sh.
-- Prerequisite: this folder must become a git repo and be pushed (not done; user decision).
+- DONE 2026-09-10: repo created and pushed to https://github.com/Ravencloned/skills-for-claude (public, main). First commit accidentally followed the `.claude/skills/vouch` junction and committed the plugin twice; second commit untracked it and added `.gitattributes` (LF). Marketplace path verified end to end: `claude plugin marketplace add Ravencloned/skills-for-claude` then `claude plugin install vouch@skills-for-claude` installed 0.2.4 at user scope; disabled again to keep the "project-level for a week" decision.
 
 ## Decisions (final, 2026-09-09 late)
 

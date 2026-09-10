@@ -19,10 +19,22 @@ mkdir -p .claude/skills && cp -r vouch .claude/skills/vouch
 printf '.vouch/\n' >> .gitignore
 ```
 
-The folder carries `.claude-plugin/plugin.json`, so Claude Code loads it as the plugin `vouch@skills-dir`
-on the next session in that project (after the workspace-trust prompt). Its `hooks/hooks.json`
-provides normal mode; `SKILL.md` provides `/vouch`; `agents/vouch-verifier.md` provides the verifier.
-Nothing to merge into settings.
+The folder carries `.claude-plugin/plugin.json`, so Claude Code should load it as the plugin
+`vouch@skills-dir` on the next interactive session in that project, after the workspace-trust
+prompt. Its `hooks/hooks.json` provides normal mode; `SKILL.md` provides `/vouch`;
+`agents/vouch-verifier.md` provides the verifier.
+
+Verified status (2026-09-10): the marketplace install (D) and `--plugin-dir` (A) are confirmed to
+load hooks, skill, and agent. The skills-dir path did not load in non-interactive (`claude -p`)
+runs, which never see the trust prompt, and a directory junction is not followed. If your first
+session shows no balance line, fall back to D, or to the standalone hooks below.
+
+### Standalone fallback (no plugin loading)
+
+Merge the `hooks` object from `vouch/hooks/hooks.json` into `.claude/settings.json`, replacing
+`${CLAUDE_PLUGIN_ROOT}` with `$CLAUDE_PROJECT_DIR/.claude/skills/vouch`, and copy
+`vouch/agents/vouch-verifier.md` to `.claude/agents/`. The engine de-duplicates hook deliveries,
+so running both the plugin and the standalone copy charges nothing twice.
 
 ## C. Install for every project
 

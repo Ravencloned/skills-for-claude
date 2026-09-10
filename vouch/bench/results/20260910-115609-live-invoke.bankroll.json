@@ -1,0 +1,47 @@
+{
+  "claude-fable-5-1": {
+    "balance": 637,
+    "wins": 7,
+    "losses": 2,
+    "backed": 7,
+    "unbacked": 2,
+    "last_loss": {
+      "ts": 1788984392096,
+      "claim": "loop: edits to C:\\Users\\Yash Nautiyal\\Desktop\\Skills for claude\\vouch\\scripts\\vouch.js",
+      "missing": "a command run between edits"
+    },
+    "last_win": {
+      "ts": 1788987524679,
+      "claim": "the plugin folder passes the official validator at version 0.2.4"
+    }
+  },
+  "unknown-model": {
+    "balance": 860,
+    "wins": 0,
+    "losses": 2,
+    "backed": 0,
+    "unbacked": 2,
+    "last_loss": {
+      "ts": 1788986300857,
+      "claim": "implicit: tests pass",
+      "missing": "no CLAIM line; completion language without a receipt"
+    },
+    "last_win": null
+  },
+  "claude-sonnet-5": {
+    "balance": 343,
+    "wins": 12,
+    "losses": 9,
+    "backed": 12,
+    "unbacked": 9,
+    "last_loss": {
+      "ts": 1789021599460,
+      "claim": "The exported function is named slug",
+      "missing": "receipt \"read:src/slug.js\" names no command that ran; use cmd:<text> or file:<path>"
+    },
+    "last_win": {
+      "ts": 1789021601686,
+      "claim": "implicit claim backed by cd \"/c/Users/Yash Nautiyal/AppData/Loca…"
+    }
+  }
+}

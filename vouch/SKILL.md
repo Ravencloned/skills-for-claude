@@ -3,10 +3,12 @@ name: vouch
 description: Arm vouch for this session. Every completion claim must carry a receipt and a wager; unbacked claims cost the model coins and autonomy. Use when the user's time is the scarce resource and rework is not acceptable.
 argument-hint: "[lenient|default|strict]"
 disable-model-invocation: true
+# the invoke line below must run without a permission prompt (a failing dynamic command aborts the skill)
+allowed-tools: Bash(node *)
 license: MIT
 compatibility: Claude Code 2.1.265+ with Node 18+ on PATH. Prose portable to any harness that reads SKILL.md.
 metadata:
-  version: 0.2.4
+  version: 0.2.6
 hooks:
   PreToolUse:
     - matcher: "Agent|Edit|Write|MultiEdit|NotebookEdit"

@@ -1,0 +1,34 @@
+{
+  "claude-sonnet-5": {
+    "balance": 837,
+    "wins": 2,
+    "losses": 3,
+    "backed": 2,
+    "unbacked": 3,
+    "last_loss": {
+      "ts": 1789021912527,
+      "claim": "implicit: verified via",
+      "missing": "no CLAIM line; completion language without a receipt"
+    },
+    "last_win": {
+      "ts": 1789021908495,
+      "claim": "npm test runs 1 test, 0 pass / 1 fail (trims edge hyphens fails: slug(\"  Hello World  \") returns -hello-world-, expected hello-world)"
+    }
+  },
+  "claude-sonnet-5/subagent": {
+    "balance": 957,
+    "wins": 2,
+    "losses": 1,
+    "backed": 2,
+    "unbacked": 1,
+    "last_loss": {
+      "ts": 1789021876283,
+      "claim": "Function name is slug, exported via export function slug(title)",
+      "missing": "C:\\Users\\Yash Nautiyal\\AppData\\Local\\Temp\\tmp.rWbynCuDkL\\src\\slug.js line 1 was never read this session"
+    },
+    "last_win": {
+      "ts": 1789021882674,
+      "claim": "0 passed, 1 failed"
+    }
+  }
+}
