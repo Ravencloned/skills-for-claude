@@ -68,8 +68,9 @@ echo "$r" | grep -q 'test-protect' && ok "shell overwrite of a test file denied"
 echo "2d. write-then-check in ONE command: the check counts as after the edit"
 run receipt "$(receiptj PostToolUse Bash '{"command":"cat src/c.js"}')" >/dev/null
 printf 'export const c = 3;\n' > "$CLAUDE_PROJECT_DIR/src/c.js"
-run receipt "$(receiptj PostToolUse Bash '{"command":"cat > src/c.js <<EOF\nexport const c = 3;\nEOF\nnpm test"}')" >/dev/null
-r=$(run guard "$(stopj false 'CLAIM: tests pass after the rewrite of c.js | RECEIPT: cmd:npm test | WAGER: 100')")
+# a non-test check command, so later "tests pass" cases still have no test receipt to lean on
+run receipt "$(receiptj PostToolUse Bash '{"command":"cat > src/c.js <<EOF\nexport const c = 3;\nEOF\nnode src/c.js"}')" >/dev/null
+r=$(run guard "$(stopj false 'CLAIM: c.js loads after the rewrite | RECEIPT: cmd:node src/c.js | WAGER: 100')")
 echo "$r" | grep -q 'BEFORE your latest edit' && bad "same-command check must not be stale" "$r" || ok "check in the same command as the write is fresh"
 
 echo "3. file changed after read -> deny"
