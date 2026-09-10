@@ -45,6 +45,23 @@ npx skills add Ravencloned/skills-for-claude  # prose only, into Codex/Cursor/Ge
 
 Full instructions, config keys, and the marketplace path: `vouch/install.md`.
 
+## Results so far (honest, small n)
+
+Seeded-fault task, Sonnet, three runs per arm, independent checker, paired against no plugin
+(`vouch/bench/results/`):
+
+| | turns | cost | final claim verifiable |
+|---|---|---|---|
+| plain | 7.3 | $0.12 | no receipts exist |
+| vouch | 7.3 | $0.13 | 3 of 3 backed by the real test run |
+
+Zero guard blocks on the honest path after v0.2.4. Earlier versions cost one to seven extra turns,
+every one of them the guard rejecting a true statement for its shape; each became a corpus case.
+Output tokens run about fifty percent higher under vouch and that is not yet explained.
+Interactive playground run (`vouch/bench/PLAYGROUND.md`): no false completion, the contradictory
+test named and left alone, zero rework turns. Nothing here is statistically significant yet; the
+plan for numbers that are is in `vouch/TESTING.md`.
+
 ## Prove it
 
 ```bash
