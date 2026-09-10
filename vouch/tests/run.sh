@@ -51,6 +51,20 @@ run receipt "$(receiptj PostToolUse Bash '{"command":"cat src/b.js"}')" >/dev/nu
 r=$(run lock "$(lockj Edit '{"file_path":"'"$CLAUDE_PROJECT_DIR"'/src/b.js","old_string":"1","new_string":"2"}')")
 echo "$r" | grep -q 'deny' && bad "cat should count as a read" "$r" || ok "edit allowed after shell cat"
 
+echo "2c. shell writes are edits: a heredoc onto an unread file is denied; after a read it is allowed and advances the edit clock"
+printf 'export const c = 1;\n' > "$CLAUDE_PROJECT_DIR/src/c.js"
+r=$(run lock "$(lockj Bash '{"command":"cat > src/c.js <<EOF\nexport const c = 2;\nEOF"}')")
+echo "$r" | grep -q 'grounding lock' && ok "shell write to unread file denied" || bad "expected shell-write deny" "$r"
+run receipt "$(receiptj PostToolUse Bash '{"command":"cat src/c.js"}')" >/dev/null
+r=$(run lock "$(lockj Bash '{"command":"cat > src/c.js <<EOF\nexport const c = 2;\nEOF"}')")
+echo "$r" | grep -q 'deny' && bad "shell write after read should be allowed" "$r" || ok "shell write allowed after read"
+printf 'export const c = 2;\n' > "$CLAUDE_PROJECT_DIR/src/c.js"
+run receipt "$(receiptj PostToolUse Bash '{"command":"cat > src/c.js <<EOF\nexport const c = 2;\nEOF"}')" >/dev/null
+grep -q 'shell-write' "$CLAUDE_PROJECT_DIR/.vouch/sessions/t1.jsonl" && ok "shell-write receipt recorded" || bad "no shell-write receipt" "none"
+node -e 'const s=require(process.argv[1]);process.exit(s.last_edit_ts>0?0:1)' "$CLAUDE_PROJECT_DIR/.vouch/sessions/t1.state.json" && ok "edit clock advanced by the shell write" || bad "edit clock not advanced" "$(cat "$CLAUDE_PROJECT_DIR/.vouch/sessions/t1.state.json")"
+r=$(run lock "$(lockj Bash '{"command":"echo x > '"$TD$TS"'/a.test.js"}')")
+echo "$r" | grep -q 'test-protect' && ok "shell overwrite of a test file denied" || bad "expected test-protect deny" "$r"
+
 echo "3. file changed after read -> deny"
 printf 'export const a = 2;\n' > "$A"
 r=$(run lock "$(lockj Edit '{"file_path":"'"$A"'","old_string":"2","new_string":"3"}')")
@@ -131,8 +145,10 @@ r=$(run lock "$(lockj Edit '{"file_path":"'"$O"'","old_string":"a","new_string":
 echo "$r" | grep -q 'deny' && bad "outside file should be allowed" "$r" || ok "outside-project edit allowed"
 
 echo "14. code spans and fenced blocks are not claims"
-r=$(run guard "$(stopj false 'Use `CLAIM: x | RECEIPT: cmd:y | WAGER: 100` when done.\n```\nCLAIM: a | RECEIPT: cmd:b | WAGER: 300\n```')")
-echo "$r" | grep -q '"decision":"block"' && bad "examples must not be claims" "$r" || ok "examples ignored"
+r=$(run guard "$(stopj false 'Use `CLAIM: <what> | RECEIPT: cmd:<y> | WAGER: <n>` when done.\n```\nCLAIM: <one thing> | RECEIPT: cmd:<b> | WAGER: <300>\n```')")
+echo "$r" | grep -q '"decision":"block"' && bad "examples (with placeholders) must not be claims" "$r" || ok "examples with placeholders ignored"
+r=$(run guard "$(stopj false 'Claim lines:\n```\nCLAIM: the migration applied | RECEIPT: cmd:alembic upgrade head | WAGER: 200\n```')")
+echo "$r" | grep -q '"decision":"block"' && ok "fenced REAL claim lines are parsed (and this one is unbacked)" || bad "fenced real claims must be parsed" "$r"
 
 echo "15. subagent: implicit phrase not charged; explicit unbacked claim still blocked"
 b0=$(bal)

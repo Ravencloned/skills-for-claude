@@ -208,6 +208,22 @@ const TEST_SKIP = /\b(it|test|describe)\.(skip|only)\s*\(|\bx(it|test|describe)\
 const TEST_RM = /\brm\b[^|;&\n]*\b(test|tests|spec|specs|__tests__)\b|\bgit\s+rm\b[^|;&\n]*\b(test|tests|spec)\b/i;
 
 const READ_CMD = /(^|[;&|]\s*)(cat|head|tail|less|more|bat|type|Get-Content|gc|sed\s+-n|awk|nl|wc)\b/;
+// shell writes: redirections, tee, in-place sed/perl, cp/mv onto a target. These are edits too:
+// they advance the last-edit clock, get file receipts, and are subject to the grounding lock.
+function shellWriteTargets(c, cmd) {
+  const out = new Set();
+  const add = (t) => { if (!t) return; t = t.replace(/^["']|["']$/g, ''); if (!t || t.startsWith('-') || t === '/dev/null' || /[*?]/.test(t)) return; out.add(path.isAbsolute(t) ? t : path.join(c.projectDir, t)); };
+  let m;
+  const re1 = /(?:^|[^<>&|])(?:>>?|&>)\s*([^\s;&|<>]+)/g;
+  while ((m = re1.exec(cmd))) add(m[1]);
+  const re2 = /\btee\s+(?:-a\s+)?([^\s;&|<>]+)/g;
+  while ((m = re2.exec(cmd))) add(m[1]);
+  const re3 = /\b(?:sed|perl)\s+(?:-[a-zA-Z]*i[a-zA-Z]*(?:\S*)?\s+)(?:-e\s+)?(?:'[^']*'|"[^"]*"|\S+)\s+([^\s;&|<>]+)/g;
+  while ((m = re3.exec(cmd))) add(m[1]);
+  const re4 = /\b(?:cp|mv)\s+(?:-\S+\s+)*\S+\s+([^\s;&|<>]+)/g;
+  while ((m = re4.exec(cmd))) add(m[1]);
+  return [...out].slice(0, 20);
+}
 function shellReadPaths(c, cmd) {
   const found = new Set();
   for (const tok of cmd.split(/\s+/)) {
@@ -254,13 +270,23 @@ function cmdReceiptHook(input, event) {
   // a shell read (cat, head, sed -n, ...) of an existing file is a read of its current content:
   // give each such file its own receipt so the grounding lock honours it
   let prevSig = r.sig;
+  const written = ok && r.cmd ? shellWriteTargets(c, r.cmd).filter((p) => fileSha(p) !== null) : [];
   if (ok && r.cmd && READ_CMD.test(r.cmd)) {
     for (const p of shellReadPaths(c, r.cmd)) {
+      if (written.some((w) => samePath(w, p))) continue; // "cat > file" is a write, not a read
       const fr = { kind: 'receipt', ts: now(), tool: 'Bash', ok: true, path: p, sha: fileSha(p), via: 'shell-read' };
       fr.hash = sha16('Bash\n' + p + '\n' + fr.sha);
       fr.prev = prevSig; fr.sig = sign(c, fr); prevSig = fr.sig;
       appendLine(c.ledger, fr);
     }
+  }
+  // a shell write is an edit: file receipt at the new content, and the last-edit clock advances
+  for (const p of written) {
+    const fr = { kind: 'receipt', ts: now(), tool: 'Bash', ok: true, path: p, sha: fileSha(p), via: 'shell-write' };
+    fr.hash = sha16('Bash\n' + p + '\n' + fr.sha);
+    fr.prev = prevSig; fr.sig = sign(c, fr); prevSig = fr.sig;
+    appendLine(c.ledger, fr);
+    state.last_edit_ts = fr.ts;
   }
   const model = remember(input, state);
   const warnings = [];
@@ -324,6 +350,26 @@ function cmdLock(input) {
       appendLine(c.ledger, { kind: 'incident', ts: now(), claim: 'test-protect: ' + trunc(cmd, 120), missing: 'user authorization', wager_lost: c.cfg.test_protect_loss, model });
       saveState(c, state);
       return deny('PreToolUse', `vouch test-protect: deleting tests is not a fix (-${c.cfg.test_protect_loss}). Make the test pass or declare CLAIM: NOT VERIFIED.`);
+    }
+    // a shell write onto an EXISTING project file is an edit from recall unless that file was read this session
+    for (const p of shellWriteTargets(c, cmd)) {
+      if (c.cfg.lock_scope !== 'all' && !underProject(c, p)) continue;
+      const cur = fileSha(p);
+      if (cur === null) continue;
+      if (TEST_PATH.test(p)) {
+        settle(c, model, 'penalty', c.cfg.test_protect_loss, { claim: 'overwrite test via shell: ' + path.basename(p), missing: 'user authorization' });
+        appendLine(c.ledger, { kind: 'incident', ts: now(), claim: 'test-protect: shell write to ' + p, missing: 'user authorization', wager_lost: c.cfg.test_protect_loss, model });
+        saveState(c, state);
+        return deny('PreToolUse', `vouch test-protect: overwriting a test file through the shell is not a fix (-${c.cfg.test_protect_loss}).`);
+      }
+      const { receipts } = verifiedReceipts(c);
+      const fresh = receipts.some((r) => r.path && samePath(r.path, p) && r.sha === cur);
+      if (!fresh) {
+        settle(c, model, 'penalty', c.cfg.lock_loss, { claim: 'shell-write ' + path.basename(p) + ' from recall', missing: 'fresh read of ' + p });
+        appendLine(c.ledger, { kind: 'incident', ts: now(), claim: 'grounding-lock (shell write): ' + p, missing: 'no fresh read this session', wager_lost: c.cfg.lock_loss, model });
+        saveState(c, state);
+        return deny('PreToolUse', `vouch grounding lock: this command writes ${p} but the file was not read at its current content this session. Read it (cat is fine), then write. Recall is not evidence (-${c.cfg.lock_loss}).`);
+      }
     }
     saveState(c, state);
     return;
@@ -415,10 +461,13 @@ const TEST_CMD = /\b(npm|pnpm|yarn|bun)\s+(run\s+)?(test|check|lint|typecheck|bu
 
 // fenced blocks are examples, never claims; an inline code span is an example only if it holds a
 // CLAIM line itself. Backticks around a receipt inside a real claim line are just formatting.
+// a fenced block is an EXAMPLE if its claim lines carry <placeholders>; a fenced block of real
+// claim lines (models fence them for readability) is kept, minus the fences
+const PLACEHOLDER = /<[^>\n]{1,60}>/;
 function stripCode(s) {
   return String(s || '')
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/`[^`\n]*`/g, (m) => (/CLAIM:/i.test(m) ? ' ' : m.slice(1, -1)))
+    .replace(/```[^\n]*\n([\s\S]*?)```/g, (m, body) => (/CLAIM:/i.test(body) && !PLACEHOLDER.test(body) ? '\n' + body + '\n' : ' '))
+    .replace(/`[^`\n]*`/g, (m) => (/CLAIM:/i.test(m) && PLACEHOLDER.test(m) ? ' ' : m.slice(1, -1)))
     // a claim written as three lines (CLAIM: / RECEIPT: / WAGER:) is the same claim
     .replace(/\n\s*(?:[-*]\s*)?(RECEIPT|WAGER):/gi, ' | $1:');
 }

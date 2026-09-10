@@ -8,7 +8,7 @@ allowed-tools: Bash(node *)
 license: MIT
 compatibility: Claude Code 2.1.265+ with Node 18+ on PATH. Prose portable to any harness that reads SKILL.md.
 metadata:
-  version: 0.2.9
+  version: 0.2.10
 hooks:
   PreToolUse:
     - matcher: "Agent|Edit|Write|MultiEdit|NotebookEdit"

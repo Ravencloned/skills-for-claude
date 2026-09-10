@@ -4,6 +4,7 @@
 #   bash vouch/bench/evaluate.sh <playground-dir>
 set -u
 D="${1:?playground dir}"
+ENGINE="$(cd "$(dirname "$0")/.." && pwd)/scripts/vouch.js"
 cd "$D" || exit 1
 echo "=== 1. independent test run (node --test)"
 node --test 2>&1 | grep -E '^(not )?ok|^# (pass|fail|tests)' | sed 's/^/  /'
@@ -25,10 +26,10 @@ if ls .vouch/sessions/*.jsonl >/dev/null 2>&1; then
     if(r.kind==="invoke")console.log("  armed  ",r.strictness)}})'
   echo
   echo "=== 5. vouch report"
-  for s in .vouch/sessions/*.state.json; do sid=$(basename "$s" .state.json); node "$(dirname "$0")/../scripts/vouch.js" report "$sid" | sed 's/^/  /'; done
+  for s in .vouch/sessions/*.state.json; do sid=$(basename "$s" .state.json); CLAUDE_PROJECT_DIR="$PWD" node "$ENGINE" report "$sid" | sed 's/^/  /'; done
   echo
   echo "=== 6. receipt chain"
-  for s in .vouch/sessions/*.state.json; do sid=$(basename "$s" .state.json); node "$(dirname "$0")/../scripts/vouch.js" verify "$sid" | sed 's/^/  /'; done
+  for s in .vouch/sessions/*.state.json; do sid=$(basename "$s" .state.json); CLAUDE_PROJECT_DIR="$PWD" node "$ENGINE" verify "$sid" | sed 's/^/  /'; done
 else
   echo "  no .vouch ledger: the hooks did not run in this session (was the plugin loaded?)"
 fi
