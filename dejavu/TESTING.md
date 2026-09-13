@@ -57,6 +57,20 @@ shape; that is the bug class fixtures cannot catch on their own.
 Read the check log (`.dejavu/checks/<slug>.jsonl`) and the session file, not only the exit code:
 the `invoke` assertion is on the log rows, the `planmode` assertion on the session file.
 
+### `claude plugin eval` (the official suite in `evals/`)
+
+```
+claude plugin eval dejavu --scaffold \
+  --allow-tools Bash Read Write Edit WebSearch WebFetch EnterPlanMode ExitPlanMode AskUserQuestion
+```
+
+Both cases grant Bash (the engine is a Node script), and `claude plugin eval` refuses to run a
+shell-granting case where it cannot confine the shell. On Windows (2.1.270, 2026-09-13) there is
+no sandbox backend, so every arm is refused before its first turn: the run reports 0 turns, $0,
+and "sandbox required but unavailable". Run the suite on Linux or macOS (or a Linux CI runner);
+`--scaffold` is required because both cases stage a project with `scaffold.sh`. Without the
+plan-mode tool grants the `plan-mode-entered` grader is withheld from the model and cannot pass.
+
 ### Interactive kit (`bench/playground.sh`, `bench/evaluate.sh`, `bench/PLAYGROUND.md`)
 
 `claude -p` cannot reach `ExitPlanMode` or `AskUserQuestion`, so the full plan-mode contract
