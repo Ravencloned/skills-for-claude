@@ -57,6 +57,17 @@ shape; that is the bug class fixtures cannot catch on their own.
 Read the check log (`.dejavu/checks/<slug>.jsonl`) and the session file, not only the exit code:
 the `invoke` assertion is on the log rows, the `planmode` assertion on the session file.
 
+### Interactive kit (`bench/playground.sh`, `bench/evaluate.sh`, `bench/PLAYGROUND.md`)
+
+`claude -p` cannot reach `ExitPlanMode` or `AskUserQuestion`, so the full plan-mode contract
+(offer, your answer, a report or a skip in your words, the gate opening) is only testable in a
+live session. `playground.sh` seeds a small API project with three roadmap features whose prior-art
+answers are known (a half-built throttle in git history, a partially solved idempotency feature, an
+in-house export format), and `evaluate.sh <dir>` grades each check from the `.dejavu/` logs: tier-0
+row present, legacy file found, library fetched, verdict earned or downgraded, skips carrying
+`user_said`, sessions offered and gated. `PLAYGROUND.md` has the prompts for the working sessions
+and the grader prompt for a separate chat.
+
 ## Tier 2: dollars, hours (a labelled topic set)
 
 There is no public benchmark for "does prior art exist for this build?", so the set is built by

@@ -102,8 +102,14 @@ bash dejavu/tests/run.sh               # pipe-tests, offline, fixtures per sourc
 bash dejavu/bench/live.sh endpoints    # every real source once, plus three inspect calls
 bash dejavu/bench/live.sh invoke       # claude -p "/dejavu quick ..." must write a report with >= 5 query rows
 bash dejavu/bench/live.sh planmode     # --permission-mode plan must offer once and gate once
+bash dejavu/bench/playground.sh        # seeded project for an interactive session; then evaluate.sh <dir> grades the logs
 node dejavu/scripts/dejavu.js status   # session state, open check, reports on file
 ```
+
+The interactive playground (`dejavu/bench/PLAYGROUND.md`) is three roadmap features with known
+answers: one a teammate half-built in this very repo, one with partial solutions in the wild, one
+in-house format nobody outside has touched. The evaluator reads the `.dejavu/` logs, never the
+model's summary.
 
 ## Layout
 
