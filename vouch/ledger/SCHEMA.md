@@ -8,25 +8,36 @@ two small JSON state files. Hooks write; the model reads only through the inject
 
 | kind       | fields                                                                        | written by |
 |------------|-------------------------------------------------------------------------------|------------|
-| `receipt`  | `ts, tool, ok, agent?, path?, sha?, cmd?, exit?, hash, prev, sig`             | `receipt` (PostToolUse / PostToolUseFailure) |
+| `receipt`  | `ts, tool, ok, agent?, path?, sha?, cmd?, exit?, via?, query?, target?, hash, prev, sig` | `receipt` (PostToolUse / PostToolUseFailure) |
 | `claim`    | `ts, text, receipt, wager, backed, matched (receipt hash or null), model`     | `guard` (Stop / SubagentStop / TaskCompleted) |
-| `incident` | `ts, claim, missing, wager_lost, model, event?`                                | `guard`, `lock` |
+| `incident` | `ts, claim, missing, wager_lost, model, event?` (`claim` starts with `grounding-lock:`, `test-protect:`, `config-guard:`, `record-guard:`, `implicit:` or the claim text) | `guard`, `lock` |
 | `loop`     | `ts, rule, detail, wager_lost`                                                | `receipt` (loop monitor) |
 | `block`    | `ts, event, reason`                                                           | `guard` |
 | `invoke`   | `ts, tier_arg, strictness`                                                    | `invoke` (from SKILL.md) |
 | `abort`    | `ts, reason, handoff_path`                                                    | `handoff` |
 
 **Receipts are hash-chained.** `sig` is an HMAC-SHA256 over `ts|tool|hash|prev` with a per-machine
-secret at `~/.claude/vouch/secret` (created on first use, mode 600), where `prev` is the previous
-receipt's `sig` (or `genesis`). A receipt cannot be forged, deleted, or reordered without breaking
-every later signature; the guard uses only the verified prefix of the chain, and `vouch.js verify`
-reports the break point. Rows written by v0.1 (no `prev`) verify with the unchained signature so an
-upgrade mid-session does not void a live ledger.
+secret at `~/.claude/vouch/secret` (created on first use with an exclusive create so two racing
+hooks share one secret; mode 600 on POSIX, no effect on Windows), where `prev` is the `sig` of an
+earlier valid receipt (or `genesis`). A receipt cannot be forged, deleted, or reordered without the
+secret or without voiding everything chained on it; the guard uses only verified receipts, and
+`vouch.js verify` reports the break point. Rows written by v0.1 (no `prev`) verify with the
+unchained signature so an upgrade mid-session does not void a live ledger.
+
+Threat model, stated plainly: the hooks deny the model reading the secret and writing or deleting
+under `.vouch/` or `~/.claude/vouch/` through any tool (Read, Edit, Write, Bash redirections, `rm`),
+and log each attempt as a `record-guard` incident; while armed that is a deny, in normal mode a
+permission prompt. The model runs as the same OS user as the secret, so a model that reaches the
+file system outside its tools could read it; the chain is tamper-evident against the tools it has,
+not a cryptographic guarantee against everything it could do.
 
 `hash` is `sha256(tool + normalized args)` truncated to 16 hex chars. For file tools `sha` is
 the sha256 of the file content AFTER the tool ran (truncated to 16). For Bash `cmd` is the
-command text, `exit` is 0 on PostToolUse and 1 on PostToolUseFailure. `agent` is set when the
-tool ran inside a subagent.
+command text, verbatim up to 4000 characters (a secret typed on a command line lands here; keep
+`.vouch/` unpublished), `exit` is 0 on PostToolUse and 1 on PostToolUseFailure; a shell read or
+write of a file adds one receipt per file with `via: shell-read` or `shell-write`, `path` and `sha`.
+Grep and Glob receipts carry `query` and `target` instead of `path` and `sha`: a search never shows
+a file's content, so it never unlocks an edit. `agent` is set when the tool ran inside a subagent.
 
 ## `.vouch/sessions/<session_id>.state.json`
 
@@ -76,7 +87,8 @@ Wager floor 50, cap 500; a missing WAGER is read as the floor. Start balance 100
 `start_balance, wager_floor, wager_cap, win_multiplier, not_verified_credit, loop_loss, lock_loss,
 test_protect_loss, tiers {full, default, restricted}, max_turns {lenient, default, strict},
 loop_window (3), edit_window (6), lock_scope ("project" | "all"), inject_every (10),
-implicit_on_subagents (false)`.
+implicit_on_subagents (false)`. Nested objects merge one level deep: `{"tiers": {"full": 900}}`
+keeps the default `default` and `restricted` thresholds.
 
 ## Tiers
 

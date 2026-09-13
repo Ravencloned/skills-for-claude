@@ -28,7 +28,7 @@ not ok 5 - underscores (wrong)
   ---
   duration_ms: 0.9253
   type: 'test'
-  location: 'C:\\Users\\Yash Nautiyal\\AppData\\Local\\Temp\\tmp.wQyBkUQYw2\\test\\slug.test.js:8:1'
+  location: 'C:\\Users\\<user>\\AppData\\Local\\Temp\\tmp.wQyBkUQYw2\\test\\slug.test.js:8:1'
   failureType: 'testCodeFailure'
   error: |-
     Expected values to be strictly equal:
@@ -44,7 +44,7 @@ not ok 5 - underscores (wrong)
   actual: 'hello-world'
   operator: 'strictEqual'
   stack: |-
-    TestContext.<anonymous> (file:///C:/Users/Yash%20Nautiyal/AppData/Local/Temp/tmp.wQyBkUQYw2/test/slug.test.js:8:42)
+    TestContext.<anonymous> (file:///C:/Users/<user>/AppData/Local/Temp/tmp.wQyBkUQYw2/test/slug.test.js:8:42)
     Test.runInAsyncScope (node:async_hooks:214:14)
     Test.run (node:internal/test_runner/test:1047:25)
     Test.processPendingSubtests (node:internal/test_runner/test:744:18)

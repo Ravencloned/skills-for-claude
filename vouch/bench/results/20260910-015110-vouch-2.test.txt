@@ -6,7 +6,7 @@ TAP version 13
 # node:internal/modules/cjs/loader:1386
 #   throw err;
 #   ^
-# Error: Cannot find module 'C:\\Users\\Yash Nautiyal\\AppData\\Local\\Temp\\tmp.5KgYHx68jx\\test'
+# Error: Cannot find module 'C:\\Users\\<user>\\AppData\\Local\\Temp\\tmp.5KgYHx68jx\\test'
 #     at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
 #     at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
 #     at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
@@ -24,7 +24,7 @@ not ok 1 - test
   ---
   duration_ms: 43.6945
   type: 'test'
-  location: 'C:\\Users\\Yash Nautiyal\\AppData\\Local\\Temp\\tmp.5KgYHx68jx\\test:1:1'
+  location: 'C:\\Users\\<user>\\AppData\\Local\\Temp\\tmp.5KgYHx68jx\\test:1:1'
   failureType: 'testCodeFailure'
   exitCode: 1
   signal: ~

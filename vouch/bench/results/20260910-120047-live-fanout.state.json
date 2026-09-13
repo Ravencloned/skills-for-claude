@@ -11,7 +11,7 @@
       "edit_ts": 0
     },
     {
-      "cmd": "cd \"/c/Users/Yash Nautiyal/AppData/Local/Temp/tmp.rWbynCuDkL\" && npm test",
+      "cmd": "cd \"/c/Users/<user>/AppData/Local/Temp/tmp.rWbynCuDkL\" && npm test",
       "ok": false,
       "edit_ts": 0
     }
@@ -28,7 +28,7 @@
     "3e502e3c9c6711bb": true
   },
   "model": "claude-sonnet-5",
-  "transcript_path": "C:\\Users\\Yash Nautiyal\\.claude\\projects\\C--Users-Yash-Nautiyal-AppData-Local-Temp-tmp-rWbynCuDkL\\efda3346-eec2-443b-9489-621723659f21.jsonl",
+  "transcript_path": "C:\\Users\\<user>\\.claude\\projects\\C--Users-Yash-Nautiyal-AppData-Local-Temp-tmp-rWbynCuDkL\\efda3346-eec2-443b-9489-621723659f21.jsonl",
   "hooks_n": 17,
   "hooks_ms": 137.2673,
   "last_inject": null,

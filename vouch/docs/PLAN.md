@@ -11,6 +11,25 @@ Built in one pass per the sequence below. Deviations from the plan, all delibera
 
 Verified: 35/35 pipe-tests (`bash vouch/tests/run.sh`); official validator passes on the skill folder; the project's settings hooks went live mid-session and the grounding lock denied a real edit made from recall (charged claude-fable-5-1 50 coins). Not verified in this session: `/vouch` invocation and the prompt-hook adjudicator (user-only invocation), SubagentStop/TaskCompleted in a real fan-out, the with/without token measurement.
 
+## v0.2.14 (2026-09-13): pre-submission review
+
+A six-lens review of the whole repo (packaging, engine bugs, docs truth, security, test quality,
+first-user experience), every serious finding checked by two independent skeptics, then one fix
+pass; 47 findings, 52 items applied, 5 minors rejected with reasons. Engine changes, each with a
+battery case: the edit-loop rule no longer fires on the honest edit/run/edit/run path (it compared
+against a timestamp it had just overwritten); shell reads and writes are tokenized quote-aware, so
+paths with spaces and Git Bash `/c/` paths are locked and credited correctly; test-protect judges
+the project-relative path, so a project folder named `my-test-app` no longer trips it, and `rm`
+targets are resolved before the test rule applies; `session_id` from hook input is sanitized before
+it becomes a file name; config merges one level deep; Grep and Glob receipts no longer count as
+reads, test runs, or shell writes; a `cmd:` receipt must match one whole command (no more two-word
+prefix matches); the hooks now refuse the model reading the signing secret or writing under the
+ledger and bankroll directories (the README states the threat model: tamper-evident against a
+model working through its tools, not a cryptographic guarantee); `readStdin` rejects non-object
+JSON; a `help` subcommand. Battery 61 -> 102 cases. Repo: a root `LICENSE` plus copies in each
+plugin folder, home paths scrubbed from every tracked bench log, playground scripts refuse to wipe
+a directory that is not a playground.
+
 ## v0.2.13 (2026-09-13): the ledger is a tree
 
 Live incident during the `dejavu` build (an eleven-agent workflow under vouch normal mode, Windows):

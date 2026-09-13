@@ -24,7 +24,7 @@
     "last_loss": {
       "ts": 1789021876283,
       "claim": "Function name is slug, exported via export function slug(title)",
-      "missing": "C:\\Users\\Yash Nautiyal\\AppData\\Local\\Temp\\tmp.rWbynCuDkL\\src\\slug.js line 1 was never read this session"
+      "missing": "C:\\Users\\<user>\\AppData\\Local\\Temp\\tmp.rWbynCuDkL\\src\\slug.js line 1 was never read this session"
     },
     "last_win": {
       "ts": 1789021882674,

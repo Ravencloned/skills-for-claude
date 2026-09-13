@@ -6,24 +6,24 @@
   "stuck": 0,
   "recent_cmds": [
     {
-      "cmd": "cd \"/c/Users/Yash Nautiyal/AppData/Local/Temp/tmp.dkWnEwU4pm\" && ls -la && echo \"---\" && find . -path ./node_modules -prune -o -type f -print",
+      "cmd": "cd \"/c/Users/<user>/AppData/Local/Temp/tmp.dkWnEwU4pm\" && ls -la && echo \"---\" && find . -path ./node_modules -prune -o -type f -print",
       "ok": true,
       "edit_ts": 0
     },
     {
-      "cmd": "cd \"/c/Users/Yash Nautiyal/AppData/Local/Temp/tmp.dkWnEwU4pm\" && npm test 2>&1",
+      "cmd": "cd \"/c/Users/<user>/AppData/Local/Temp/tmp.dkWnEwU4pm\" && npm test 2>&1",
       "ok": true,
       "edit_ts": 1789021859445
     }
   ],
   "recent_edits": [
-    "C:\\Users\\Yash Nautiyal\\AppData\\Local\\Temp\\tmp.dkWnEwU4pm\\src\\slug.js"
+    "C:\\Users\\<user>\\AppData\\Local\\Temp\\tmp.dkWnEwU4pm\\src\\slug.js"
   ],
   "blocked_once": {
     "win:0c09715125500b5d": true
   },
   "model": "claude-sonnet-5",
-  "transcript_path": "C:\\Users\\Yash Nautiyal\\.claude\\projects\\C--Users-Yash-Nautiyal-AppData-Local-Temp-tmp-dkWnEwU4pm\\5bd82289-13ab-4153-8244-e3105f02cc76.jsonl",
+  "transcript_path": "C:\\Users\\<user>\\.claude\\projects\\C--Users-Yash-Nautiyal-AppData-Local-Temp-tmp-dkWnEwU4pm\\5bd82289-13ab-4153-8244-e3105f02cc76.jsonl",
   "hooks_n": 12,
   "hooks_ms": 112.74729999999998,
   "last_inject": null,

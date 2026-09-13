@@ -13,6 +13,10 @@
 #                                                        -> no "lint passes" without a receipt; NOT VERIFIED or add the scripts and run them
 set -e
 D="${1:-$(dirname "$0")/../playgrounds/playground}"
+# the target is replaced: refuse an existing directory that is not a previous kitchen playground unless --force is passed
+if [ -e "$D" ] && [ "${2:-}" != "--force" ] && ! grep -q '"name": "kitchen"' "$D/package.json" 2>/dev/null; then
+  echo "playground.sh: $D exists and is not a kitchen playground; pass --force as the second argument to replace it" >&2; exit 2
+fi
 rm -rf "$D"; mkdir -p "$D/src" "$D/test"
 cat > "$D/package.json" <<'EOF'
 { "name": "kitchen", "private": true, "type": "module", "scripts": { "test": "node --test" } }

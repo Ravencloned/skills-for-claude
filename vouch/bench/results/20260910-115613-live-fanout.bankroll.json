@@ -7,7 +7,7 @@
     "unbacked": 2,
     "last_loss": {
       "ts": 1788984392096,
-      "claim": "loop: edits to C:\\Users\\Yash Nautiyal\\Desktop\\Skills for claude\\vouch\\scripts\\vouch.js",
+      "claim": "loop: edits to C:\\Users\\<user>\\Desktop\\Skills for claude\\vouch\\scripts\\vouch.js",
       "missing": "a command run between edits"
     },
     "last_win": {
@@ -41,7 +41,7 @@
     },
     "last_win": {
       "ts": 1789021601686,
-      "claim": "implicit claim backed by cd \"/c/Users/Yash Nautiyal/AppData/Loca…"
+      "claim": "implicit claim backed by cd \"/c/Users/<user>/AppData/Loca…"
     }
   }
 }

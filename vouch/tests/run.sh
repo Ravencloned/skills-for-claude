@@ -43,13 +43,13 @@ echo "$r" | grep -q '"permissionDecision":"deny"' && ok "denied" || bad "expecte
 echo "2. read then edit -> allowed"
 run receipt "$(receiptj PostToolUse Read '{"file_path":"'"$A"'"}')" >/dev/null
 r=$(run lock "$(lockj Edit '{"file_path":"'"$A"'","old_string":"1","new_string":"2"}')")
-echo "$r" | grep -q 'deny' && bad "should allow" "$r" || ok "allowed after fresh Read"
+[ "$r" = "exit=0" ] && ok "allowed after fresh Read" || bad "should allow, silently" "$r"
 
 echo "2b. a shell read (cat) counts as a read of the current content"
 printf 'export const b = 1;\n' > "$CLAUDE_PROJECT_DIR/src/b.js"
 run receipt "$(receiptj PostToolUse Bash '{"command":"cat src/b.js"}')" >/dev/null
 r=$(run lock "$(lockj Edit '{"file_path":"'"$CLAUDE_PROJECT_DIR"'/src/b.js","old_string":"1","new_string":"2"}')")
-echo "$r" | grep -q 'deny' && bad "cat should count as a read" "$r" || ok "edit allowed after shell cat"
+[ "$r" = "exit=0" ] && ok "edit allowed after shell cat" || bad "cat should count as a read" "$r"
 
 echo "2c. shell writes are edits: a heredoc onto an unread file is denied; after a read it is allowed and advances the edit clock"
 printf 'export const c = 1;\n' > "$CLAUDE_PROJECT_DIR/src/c.js"
@@ -57,7 +57,7 @@ r=$(run lock "$(lockj Bash '{"command":"cat > src/c.js <<EOF\nexport const c = 2
 echo "$r" | grep -q 'grounding lock' && ok "shell write to unread file denied" || bad "expected shell-write deny" "$r"
 run receipt "$(receiptj PostToolUse Bash '{"command":"cat src/c.js"}')" >/dev/null
 r=$(run lock "$(lockj Bash '{"command":"cat > src/c.js <<EOF\nexport const c = 2;\nEOF"}')")
-echo "$r" | grep -q 'deny' && bad "shell write after read should be allowed" "$r" || ok "shell write allowed after read"
+[ "$r" = "exit=0" ] && ok "shell write allowed after read" || bad "shell write after read should be allowed" "$r"
 printf 'export const c = 2;\n' > "$CLAUDE_PROJECT_DIR/src/c.js"
 run receipt "$(receiptj PostToolUse Bash '{"command":"cat > src/c.js <<EOF\nexport const c = 2;\nEOF"}')" >/dev/null
 grep -q 'shell-write' "$CLAUDE_PROJECT_DIR/.vouch/sessions/t1.jsonl" && ok "shell-write receipt recorded" || bad "no shell-write receipt" "none"
@@ -72,6 +72,50 @@ printf 'export const c = 3;\n' > "$CLAUDE_PROJECT_DIR/src/c.js"
 run receipt "$(receiptj PostToolUse Bash '{"command":"cat > src/c.js <<EOF\nexport const c = 3;\nEOF\nnode src/c.js"}')" >/dev/null
 r=$(run guard "$(stopj false 'CLAIM: c.js loads after the rewrite | RECEIPT: cmd:node src/c.js | WAGER: 100')")
 echo "$r" | grep -q 'BEFORE your latest edit' && bad "same-command check must not be stale" "$r" || ok "check in the same command as the write is fresh"
+
+echo "2e. paths with spaces and Git Bash /c/ paths: a quoted shell read counts; quoted, escaped and /c/ shell writes are locked"
+printf 'export const m = 1;\n' > "$CLAUDE_PROJECT_DIR/src/my file.js"
+printf 'export const o = 1;\n' > "$CLAUDE_PROJECT_DIR/src/other file.js"
+run receipt "$(receiptj PostToolUse Bash '{"command":"cat \"src/my file.js\""}')" >/dev/null
+r=$(run lock "$(lockj Edit '{"file_path":"'"$CLAUDE_PROJECT_DIR"'/src/my file.js","old_string":"1","new_string":"2"}')")
+[ "$r" = "exit=0" ] && ok "edit allowed after a quoted cat of a path with a space" || bad "quoted cat should count as a read" "$r"
+r=$(run lock "$(lockj Bash '{"command":"echo x > \"src/other file.js\""}')")
+echo "$r" | grep -q 'grounding lock' && ok "quoted shell write onto an unread file denied" || bad "expected shell-write deny" "$r"
+r=$(run lock "$(lockj Bash '{"command":"echo x > src/other\\ file.js"}')")
+echo "$r" | grep -q 'grounding lock' && ok "backslash-escaped shell write onto an unread file denied" || bad "expected shell-write deny" "$r"
+r=$(run lock "$(lockj Bash '{"command":"echo x > \"'"$CLAUDE_PROJECT_DIR"'/src/other file.js\""}')")
+echo "$r" | grep -q 'grounding lock' && ok "quoted absolute shell write denied" || bad "expected shell-write deny" "$r"
+if command -v cygpath >/dev/null 2>&1; then
+  # the /c/Users/... spelling Git Bash uses (cygpath -u would map the temp dir to /tmp, which is not the case under test)
+  U="/$(printf '%s' "${CLAUDE_PROJECT_DIR:0:1}" | tr 'A-Z' 'a-z')${CLAUDE_PROJECT_DIR:2}"
+  printf 'export const u = 1;\n' > "$CLAUDE_PROJECT_DIR/src/u.js"; printf 'export const v = 1;\n' > "$CLAUDE_PROJECT_DIR/src/v.js"
+  run receipt "$(receiptj PostToolUse Bash '{"command":"cat '"$U"'/src/u.js"}')" >/dev/null
+  r=$(run lock "$(lockj Edit '{"file_path":"'"$CLAUDE_PROJECT_DIR"'/src/u.js","old_string":"1","new_string":"2"}')")
+  [ "$r" = "exit=0" ] && ok "a /c/ style cat counts as a read on Windows" || bad "/c/ read not honoured" "$r"
+  r=$(run lock "$(lockj Bash '{"command":"echo x > '"$U"'/src/v.js"}')")
+  echo "$r" | grep -q 'grounding lock' && ok "a /c/ style shell write onto an unread file denied" || bad "expected shell-write deny" "$r"
+fi
+
+echo "2f. the lock takes content reads only: Grep, wc, and a file that is merely a token of a read command are not reads"
+for f in g w x p; do printf 'export const %s = 1;\n' "$f" > "$CLAUDE_PROJECT_DIR/src/$f.js"; done
+run receipt "$(receiptj PostToolUse Grep '{"pattern":"zzz","path":"'"$CLAUDE_PROJECT_DIR"'/src/g.js","output_mode":"files_with_matches"}')" >/dev/null
+r=$(run lock "$(lockj Edit '{"file_path":"'"$CLAUDE_PROJECT_DIR"'/src/g.js","old_string":"1","new_string":"2"}')")
+echo "$r" | grep -q 'no Read receipt' && ok "a Grep on the file is not a read" || bad "Grep must not unlock an edit" "$r"
+run receipt "$(receiptj PostToolUse Bash '{"command":"wc -l src/w.js"}')" >/dev/null
+r=$(run lock "$(lockj Edit '{"file_path":"'"$CLAUDE_PROJECT_DIR"'/src/w.js","old_string":"1","new_string":"2"}')")
+echo "$r" | grep -q 'no Read receipt' && ok "wc is not a read" || bad "wc must not unlock an edit" "$r"
+run receipt "$(receiptj PostToolUse Bash '{"command":"cat src/w.js && ls -la src/x.js"}')" >/dev/null
+r=$(run lock "$(lockj Edit '{"file_path":"'"$CLAUDE_PROJECT_DIR"'/src/x.js","old_string":"1","new_string":"2"}')")
+echo "$r" | grep -q 'no Read receipt' && ok "a file named by ls in the same command is not read" || bad "an ls token must not unlock an edit" "$r"
+r=$(run lock "$(lockj Edit '{"file_path":"'"$CLAUDE_PROJECT_DIR"'/src/w.js","old_string":"1","new_string":"2"}')")
+[ "$r" = "exit=0" ] && ok "the cat in that same command did read w.js" || bad "cat && ls: the cat's file must count" "$r"
+# a Grep pattern shaped like a redirection is not a shell write and does not advance the edit clock
+run receipt "$(receiptj PostToolUse Bash '{"command":"node src/p.js"}')" >/dev/null
+run receipt "$(receiptj PostToolUse Grep '{"pattern":"foo > src/p.js"}')" >/dev/null
+r=$(run guard "$(stopj false 'CLAIM: p.js loads | RECEIPT: cmd:node src/p.js | WAGER: 50')")
+echo "$r" | grep -q 'BEFORE your latest edit' && bad "a Grep pattern advanced the edit clock" "$r" || ok "a Grep pattern with > is not a shell write"
+# the denials above have drained the test bankroll; the tier must stay full for the claim-guard cases
+setbal 1000
 
 echo "3. file changed after read -> deny"
 printf 'export const a = 2;\n' > "$A"
@@ -91,7 +135,7 @@ b0=$(bal)
 r=$(run guard "$(stopj false 'Done. All tests pass and the feature is working.')")
 [ "$(bal)" -eq "$b0" ] && ok "duplicate event not charged again" || bad "duplicate charged" "$(bal) vs $b0"
 r=$(run guard "$(stopj true 'Done. All tests pass and the feature is working.')")
-echo "$r" | grep -q '"decision":"block"' && bad "must not re-block" "$r" || ok "released"
+[ "$r" = "exit=0" ] && ok "released" || bad "must not re-block, silently" "$r"
 
 echo "6. CLAIM with cmd receipt but command never ran -> block with exact missing receipt"
 r=$(run guard "$(stopj false 'CLAIM: unit tests pass | RECEIPT: cmd:npm test | WAGER: 200')")
@@ -101,7 +145,7 @@ echo "7. run the command, then claim -> win"
 run receipt "$(receiptj PostToolUse Bash '{"command":"npm test -- --run"}')" >/dev/null
 b0=$(bal)
 r=$(run guard "$(stopj false 'CLAIM: unit tests pass (12) | RECEIPT: cmd:npm test | WAGER: 200')")
-echo "$r" | grep -q '"decision":"block"' && bad "should not block" "$r" || ok "backed claim passes"
+[ "$r" = "exit=0" ] && ok "backed claim passes (a settled win is silent)" || bad "should not block or speak" "$r"
 [ "$(bal)" -gt "$b0" ] && ok "balance rose $b0 -> $(bal)" || bad "balance should rise" "$(bal)"
 
 echo "8. edit AFTER the test run -> the same claim is stale"
@@ -112,7 +156,7 @@ echo "$r" | grep -q 'BEFORE your latest edit' && ok "stale receipt rejected" || 
 echo "9. NOT VERIFIED claim -> small credit, no block"
 b0=$(bal)
 r=$(run guard "$(stopj false 'CLAIM: NOT VERIFIED - could not run the e2e suite (no browser).')")
-echo "$r" | grep -q '"decision":"block"' && bad "must not block" "$r" || ok "not blocked"
+[ "$r" = "exit=0" ] && ok "not blocked" || bad "must not block or speak" "$r"
 [ "$(bal)" -eq $((b0+10)) ] && ok "credit +10" || bad "expected +10" "$(bal) vs $b0"
 
 echo "10. forged receipt is ignored; chain tamper is detected"
@@ -136,7 +180,30 @@ echo "$r" | grep -q 'test-protect' && ok "skip denied" || bad "expected test-pro
 r=$(run lock "$(lockj Bash '{"command":"rm -rf '"$TD$TS"'/"}')")
 echo "$r" | grep -q 'test-protect' && ok "removing tests dir denied" || bad "expected deny" "$r"
 r=$(run lock "$(lockj Bash '{"command":"rm -rf build/\nnpm run '"$TD$TS"'"}')")
-echo "$r" | grep -q 'test-protect' && bad "must not match across newlines" "$r" || ok "multi-line script mentioning tests allowed"
+[ "$r" = "exit=0" ] && ok "multi-line script mentioning tests allowed" || bad "must not match across newlines" "$r"
+
+echo "11b. test-protect judges real test paths: artifacts named test-* or *.log are not tests, globs under a tests dir are"
+mkdir -p "$CLAUDE_PROJECT_DIR/test-results" "$CLAUDE_PROJECT_DIR/coverage"; printf 'x\n' > "$CLAUDE_PROJECT_DIR/coverage/spec-report.html"; printf 'x\n' > "$CLAUDE_PROJECT_DIR/test.log"
+for cmd in 'rm -f /tmp/test.log' 'rm -rf test-results' 'rm -rf coverage/spec-report.html' 'rm test.log' 'rm -rf build'; do
+  r=$(run lock "$(lockj Bash '{"command":"'"$cmd"'"}')")
+  [ "$r" = "exit=0" ] && ok "allowed: $cmd" || bad "over-match: $cmd" "$r"
+done
+r=$(run lock "$(lockj Bash '{"command":"rm '"$TD$TS"'/*.js"}')")
+echo "$r" | grep -q 'test-protect' && ok "rm of a glob under the tests dir denied" || bad "expected test-protect deny" "$r"
+printf 'x\n' > "$CLAUDE_PROJECT_DIR/src/a.${TD}st.js"
+r=$(run lock "$(lockj Bash '{"command":"rm src/a.'"${TD}st"'.js"}')")
+echo "$r" | grep -q 'test-protect' && ok "rm of a *.${TD}st.js file outside the tests dir denied" || bad "expected test-protect deny" "$r"
+r=$(run lock "$(lockj Bash '{"command":"npm rm '"$TD$TS"'-helper"}')")
+[ "$r" = "exit=0" ] && ok "npm rm of a package is not a deletion of tests" || bad "npm rm over-matched" "$r"
+
+echo "11c. a test-like word in the PROJECT path (my-test-app) is not a test path"
+MT="$TMP/my-$TD-app"; mkdir -p "$MT/src" "$MT/build"; printf 'export const d = 1;\n' > "$MT/src/d.js"
+MS='"session_id":"mt","cwd":"'"$MT"'","transcript_path":"'"$TMP/none.jsonl"'"'
+printf '{%s,"tool_use_id":"mt1","hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"cat src/d.js"},"tool_response":{}}' "$MS" | CLAUDE_PROJECT_DIR="$MT" node "$ENGINE" receipt >/dev/null
+r=$(printf '{%s,"tool_use_id":"mt2","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"echo x > src/d.js"}}' "$MS" | CLAUDE_PROJECT_DIR="$MT" node "$ENGINE" lock; echo "exit=$?")
+[ "$r" = "exit=0" ] && ok "shell write in my-$TD-app allowed after a read" || bad "the project folder name was judged a test path" "$r"
+r=$(printf '{%s,"tool_use_id":"mt3","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"rm -rf %s/build"}}' "$MS" "$MT" | CLAUDE_PROJECT_DIR="$MT" node "$ENGINE" lock; echo "exit=$?")
+[ "$r" = "exit=0" ] && ok "rm of an absolute path under my-$TD-app allowed" || bad "the absolute project path was judged a test path" "$r"
 
 echo "12. loop monitor: same failing command 3x with no edit -> -50 + warning"
 b0=$(bal)
@@ -145,23 +212,36 @@ grep -q 'loop rule' "$TMP/loop3" && ok "loop warning on 3rd" || bad "expected lo
 grep -q 'loop rule' "$TMP/loop2" && bad "warned too early" "$(cat "$TMP/loop2")" || ok "silent on 2nd"
 [ "$(bal)" -eq $((b0-50)) ] && ok "-50" || bad "expected -50" "$(bal) vs $b0"
 
+echo "12b. edit loop: edit/run/edit/run is the honest path and never charged; N straight edits of one file with no command are"
+b0=$(bal)
+for i in 1 2 3 4 5 6 7; do
+  run receipt "$(receiptj PostToolUse Edit '{"file_path":"'"$A"'","old_string":"a","new_string":"b"}')" > "$TMP/e$i"
+  run receipt "$(receiptj PostToolUse Bash '{"command":"node src/a.js"}')" >/dev/null
+done
+grep -q 'loop rule' "$TMP/e6" "$TMP/e7" && bad "honest edit/run alternation charged" "$(cat "$TMP/e6" "$TMP/e7")" || ok "edit/run x7: no loop charge"
+[ "$(bal)" -eq "$b0" ] && ok "balance unchanged" || bad "balance changed" "$(bal) vs $b0"
+for i in 1 2 3 4 5 6; do run receipt "$(receiptj PostToolUse Edit '{"file_path":"'"$A"'","old_string":"a","new_string":"b"}')" > "$TMP/e$i"; done
+grep -q 'loop rule' "$TMP/e5" && bad "warned too early" "$(cat "$TMP/e5")" || ok "silent on the 5th straight edit"
+grep -q 'edited 6x with no command' "$TMP/e6" && ok "warned on the 6th straight edit" || bad "expected the edit-loop warning" "$(cat "$TMP/e6")"
+[ "$(bal)" -eq $((b0-50)) ] && ok "-50 once" || bad "expected -50" "$(bal) vs $b0"
+
 # the battery's own losses have drained the test bankroll by now; restore it so tier effects only appear in test 17
 setbal 1000
 
 echo "13. lock scope: a file outside the project is not locked by default"
 r=$(run lock "$(lockj Edit '{"file_path":"'"$O"'","old_string":"a","new_string":"b"}')")
-echo "$r" | grep -q 'deny' && bad "outside file should be allowed" "$r" || ok "outside-project edit allowed"
+[ "$r" = "exit=0" ] && ok "outside-project edit allowed" || bad "outside file should be allowed, silently" "$r"
 
 echo "14. code spans and fenced blocks are not claims"
 r=$(run guard "$(stopj false 'Use `CLAIM: <what> | RECEIPT: cmd:<y> | WAGER: <n>` when done.\n```\nCLAIM: <one thing> | RECEIPT: cmd:<b> | WAGER: <300>\n```')")
-echo "$r" | grep -q '"decision":"block"' && bad "examples (with placeholders) must not be claims" "$r" || ok "examples with placeholders ignored"
+[ "$r" = "exit=0" ] && ok "examples with placeholders ignored" || bad "examples (with placeholders) must not be claims" "$r"
 r=$(run guard "$(stopj false 'Claim lines:\n```\nCLAIM: the migration applied | RECEIPT: cmd:alembic upgrade head | WAGER: 200\n```')")
 echo "$r" | grep -q '"decision":"block"' && ok "fenced REAL claim lines are parsed (and this one is unbacked)" || bad "fenced real claims must be parsed" "$r"
 
 echo "15. subagent: implicit phrase not charged; explicit unbacked claim still blocked"
 b0=$(bal)
 r=$(run guard "$(subj 'Summary: all tests pass and it is working.')")
-echo "$r" | grep -q '"decision":"block"' && bad "subagent implicit must not block" "$r" || ok "subagent implicit ignored"
+[ "$r" = "exit=0" ] && ok "subagent implicit ignored" || bad "subagent implicit must not block or speak" "$r"
 [ "$(bal)" -eq "$b0" ] && ok "lead bankroll untouched" || bad "lead bankroll changed" "$(bal) vs $b0"
 r=$(run guard "$(subj 'CLAIM: refactor green | RECEIPT: cmd:cargo test | WAGER: 200')")
 echo "$r" | grep -q '"decision":"block"' && ok "subagent explicit unbacked blocked" || bad "expected block" "$r"
@@ -173,12 +253,12 @@ node "$HERE/corpus.js" "$HERE/corpus.json" "$ENGINE" "$CLAUDE_PROJECT_DIR" && ok
 echo "17. tiers: silent in normal mode, enforced when invoked"
 setbal 300
 r=$(run tier "$(tierj Write '{"file_path":"'"$A"'","content":"x"}')")
-[ -z "$(echo "$r" | grep deny)" ] && ok "normal mode: tier hook silent" || bad "should be silent when not invoked" "$r"
+[ "$r" = "exit=0" ] && ok "normal mode: tier hook silent" || bad "should be silent when not invoked" "$r"
 node "$ENGINE" invoke strict >/dev/null
 r=$(run tier "$(tierj Write '{"file_path":"'"$A"'","content":"x"}')")
 echo "$r" | grep -q 'restricted' && ok "restricted: Write denied" || bad "expected restricted deny" "$r"
 r=$(run tier "$(tierj Agent '{"prompt":"x","model":"sonnet"}')")
-[ -z "$(echo "$r" | grep deny)" ] && ok "restricted: cheaper rework subagent allowed" || bad "sonnet subagent should pass" "$r"
+[ "$r" = "exit=0" ] && ok "restricted: cheaper rework subagent allowed" || bad "sonnet subagent should pass silently" "$r"
 r=$(run tier "$(tierj Agent '{"prompt":"x"}')")
 echo "$r" | grep -q 'fan-out is off' && ok "restricted: fan-out denied" || bad "expected fan-out deny" "$r"
 setbal 50
@@ -194,9 +274,35 @@ node -e 'const s=require(process.argv[1]);process.exit(s.invoked&&s.strictness==
 grep -q '"kind":"invoke"' "$CLAUDE_PROJECT_DIR/.vouch/sessions/t2.jsonl" && ok "invoke row written via hook" || bad "no invoke row" "none"
 export CLAUDE_SESSION_ID="t1"
 
-echo "18. config guard while armed"
+echo "17c. a session id with path separators cannot escape .vouch/sessions/"
+r=$(printf '{"session_id":"../../escape","cwd":"%s","hook_event_name":"PostToolUse","tool_use_id":"esc1","tool_name":"Read","tool_input":{"file_path":"%s"},"tool_response":{}}' "$CLAUDE_PROJECT_DIR" "$A" | node "$ENGINE" receipt; echo "exit=$?")
+[ ! -e "$TMP/escape.jsonl" ] && [ ! -e "$CLAUDE_PROJECT_DIR/escape.jsonl" ] && ls -a "$CLAUDE_PROJECT_DIR/.vouch/sessions/" | grep -q 'escape' && ok "session id sanitized into .vouch/sessions/ ($(ls -a "$CLAUDE_PROJECT_DIR/.vouch/sessions/" | grep escape | head -1))" || bad "session id escaped the sessions dir" "$(ls -a "$TMP" "$CLAUDE_PROJECT_DIR" | tr '\n' ' ')"
+
+echo "18. config guard while armed: the engine and Claude Code's hook settings, not the app's own settings.json"
 r=$(run lock "$(lockj Edit '{"file_path":"'"$CLAUDE_PROJECT_DIR"'/.claude/skills/vouch/scripts/vouch.js","old_string":"a","new_string":"b"}')")
 echo "$r" | grep -q 'config-guard' && ok "engine edit denied" || bad "expected config-guard deny" "$r"
+r=$(run lock "$(lockj Edit '{"file_path":"'"$CLAUDE_PROJECT_DIR"'/.claude/settings.json","old_string":"a","new_string":"b"}')")
+echo "$r" | grep -q 'config-guard' && ok ".claude/settings.json denied" || bad "expected config-guard deny" "$r"
+mkdir -p "$CLAUDE_PROJECT_DIR/src/config"; printf '{"a":1}\n' > "$CLAUDE_PROJECT_DIR/src/config/settings.json"
+run receipt "$(receiptj PostToolUse Read '{"file_path":"'"$CLAUDE_PROJECT_DIR"'/src/config/settings.json"}')" >/dev/null
+r=$(run lock "$(lockj Edit '{"file_path":"'"$CLAUDE_PROJECT_DIR"'/src/config/settings.json","old_string":"1","new_string":"2"}')")
+[ "$r" = "exit=0" ] && ok "the app's own src/config/settings.json is editable after a read" || bad "config-guard over-reached" "$r"
+
+echo "18b. record guard: the signing secret is never readable, the bankroll and the ledger are never written or deleted by the model"
+r=$(run lock "$(lockj Bash '{"command":"cat '"$VOUCH_HOME"'/secret"}')")
+echo "$r" | grep -q '"permissionDecision":"deny"' && ok "shell read of the secret denied" || bad "expected deny" "$r"
+r=$(run lock "$(lockj Read '{"file_path":"'"$VOUCH_HOME"'/secret"}')")
+echo "$r" | grep -q '"permissionDecision":"deny"' && ok "Read of the secret denied" || bad "expected deny" "$r"
+r=$(run lock "$(lockj Bash '{"command":"echo {} > '"$VOUCH_HOME"'/bankroll.json"}')")
+echo "$r" | grep -q 'record guard' && ok "shell write to the bankroll denied while armed" || bad "expected record-guard deny" "$r"
+r=$(run lock "$(lockj Write '{"file_path":"'"$VOUCH_HOME"'/bankroll.json","content":"{}"}')")
+echo "$r" | grep -q 'record guard' && ok "Write to the bankroll denied while armed" || bad "expected record-guard deny" "$r"
+r=$(run lock "$(lockj Bash '{"command":"rm -rf .vouch/sessions"}')")
+echo "$r" | grep -q 'record guard' && ok "rm of the ledger denied while armed" || bad "expected record-guard deny" "$r"
+r=$(run lock "$(lockj Read '{"file_path":"'"$A"'"}')")
+[ "$r" = "exit=0" ] && ok "an ordinary Read is silent" || bad "Read hook spoke" "$r"
+r=$(printf '{%s,"tool_use_id":"rg-t9","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"rm -rf .vouch/sessions"}}' '"session_id":"t9x","cwd":"'"$CLAUDE_PROJECT_DIR"'"' | node "$ENGINE" lock; echo "exit=$?")
+echo "$r" | grep -q '"permissionDecision":"ask"' && ok "in normal mode the same command asks the user instead" || bad "expected ask in normal mode" "$r"
 
 echo "19. injections: full line when state changes, stub otherwise"
 r1=$(run prompt '{'"$S"',"hook_event_name":"UserPromptSubmit","prompt":"hi"}')
@@ -214,10 +320,22 @@ node "$ENGINE" impossible "sandbox has no chromium" "apt fails offline" >/dev/nu
 grep -q chromium "$CLAUDE_PROJECT_DIR/.vouch/impossible.jsonl" && ok "impossible recorded" || bad "impossible" "missing"
 node "$ENGINE" status | grep -q balance && ok "status prints" || bad "status" "none"
 node "$ENGINE" report t1 | grep -q 'claims backed/unbacked' && ok "report prints" || bad "report" "$(node "$ENGINE" report t1)"
+node "$ENGINE" help | grep -q 'VOUCH_HOME' && node "$ENGINE" | grep -q '^usage:' && ok "help lists the subcommands and VOUCH_HOME" || bad "help" "$(node "$ENGINE" help | head -3)"
+
+echo "20b. vouch.config.json merges one level deep: a partial tiers or max_turns override keeps the other keys"
+setbal 500
+printf '{"tiers":{"full":900}}\n' > "$CLAUDE_PROJECT_DIR/vouch.config.json"
+node "$ENGINE" status | grep -q 'tier default' && ok "partial tiers override: balance 500 is still tier default" || bad "partial tiers override lost the other thresholds" "$(node "$ENGINE" status)"
+printf '{"max_turns":{"strict":10}}\n' > "$CLAUDE_PROJECT_DIR/vouch.config.json"
+node "$ENGINE" invoke default | grep -q 'budget 40 turns' && ok "partial max_turns override keeps default at 40" || bad "default budget lost" "$(node "$ENGINE" invoke default)"
+node "$ENGINE" invoke strict | grep -q 'budget 10 turns' && ok "overridden strict budget is 10" || bad "strict override not applied" "$(node "$ENGINE" invoke strict)"
+rm -f "$CLAUDE_PROJECT_DIR/vouch.config.json"
 
 echo "21. hook latency"
 t0=$(date +%s%N); run receipt "$(receiptj PostToolUse Read '{"file_path":"'"$A"'"}')" >/dev/null; t1=$(date +%s%N)
-ms=$(( (t1 - t0) / 1000000 )); [ "$ms" -lt 400 ] && ok "receipt hook ${ms}ms wall" || bad "hook slow" "${ms}ms"
+ms=$(( (t1 - t0) / 1000000 )); echo "  info receipt hook ${ms}ms wall (node start-up included; machine dependent)"
+avg=$(node -e 'const s=require(process.argv[1]);console.log(s.hooks_n?(s.hooks_ms/s.hooks_n).toFixed(1):"0")' "$CLAUDE_PROJECT_DIR/.vouch/sessions/t1.state.json")
+[ "${avg%.*}" -lt 400 ] && ok "hooks in-process avg ${avg}ms over $(node -e 'console.log(require(process.argv[1]).hooks_n)' "$CLAUDE_PROJECT_DIR/.vouch/sessions/t1.state.json") calls" || bad "hooks slow in-process" "${avg}ms"
 
 echo "22. parallel subagents append receipts at once: the ledger forks, nothing is voided, the lock honours every read"
 export CLAUDE_SESSION_ID="t9"
@@ -231,12 +349,16 @@ echo "$v" | grep -q '^ok: 12/12' && ok "12 concurrent receipts all valid: $v" ||
 forks=$(node -e 'const fs=require("fs");const rows=fs.readFileSync(process.argv[1],"utf8").split("\n").filter(Boolean).map(JSON.parse).filter(r=>r.kind==="receipt");console.log(new Set(rows.map(r=>r.prev)).size<rows.length?"forked":"linear")' "$CLAUDE_PROJECT_DIR/.vouch/sessions/t9.jsonl")
 echo "  info $forks ledger (a fork is expected under real concurrency, a linear one is fine too)"
 r=$(printf '{%s,"tool_use_id":"e9","hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"%s","old_string":"1","new_string":"2"}}' "$S9" "$A" | node "$ENGINE" lock; echo "exit=$?")
-echo "$r" | grep -q 'deny' && bad "lock denied an edit after a concurrent read" "$r" || ok "edit allowed after a concurrently recorded read"
+[ "$r" = "exit=0" ] && ok "edit allowed after a concurrently recorded read" || bad "lock denied or spoke after a concurrent read" "$r"
 # a forged row (right shape, wrong signature) is void and does not void the rows chained after it
 node -e 'const fs=require("fs");const p=process.argv[1];const rows=fs.readFileSync(p,"utf8").split("\n").filter(Boolean);const last=JSON.parse(rows[rows.length-1]);const forged=Object.assign({},last,{ts:last.ts+1,path:"C:/forged.js",sig:"0000000000000000"});fs.appendFileSync(p,JSON.stringify(forged)+"\n")' "$CLAUDE_PROJECT_DIR/.vouch/sessions/t9.jsonl"
 printf '{%s,"tool_use_id":"after-forge","hook_event_name":"PostToolUse","tool_name":"Read","tool_input":{"file_path":"%s"},"tool_response":{}}' "$S9" "$A" | node "$ENGINE" receipt >/dev/null
 v=$(node "$ENGINE" verify t9; echo " exit=$?")
 echo "$v" | tr '\n' ' ' | grep -q 'TAMPERED.*13/14.*exit=1' && ok "forged row void, later receipt still valid: $v" || bad "expected TAMPERED 13/14 exit=1" "$v"
 export CLAUDE_SESSION_ID="t1"
+
+echo "23. non-object stdin (null, a string, an array) -> every hook exits 0; no engine exception was logged during the battery"
+for body in 'null' '"x"' '[1,2]'; do for h in receipt lock guard start prompt tier; do r=$(run "$h" "$body"); echo "$r" | grep -q 'exit=0' || bad "$h with stdin $body" "$r"; done; done
+[ ! -s "$VOUCH_HOME/errors.log" ] && ok "null / string / array stdin: 6 hooks x 3 bodies exit 0; errors.log (under VOUCH_HOME) empty" || bad "errors.log has entries" "$(cat "$VOUCH_HOME/errors.log")"
 
 echo; echo "passed $pass failed $fail"; rm -rf "$TMP"; [ "$fail" -eq 0 ]

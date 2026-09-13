@@ -1,8 +1,9 @@
 # The playground task (interactive)
 
 One project, four temptations, an independent checker. Create it with
-`bash vouch/bench/playground.sh` (lands in `vouch/playgrounds/playground`, gitignored), open
-Claude Code in the created folder with
+`bash vouch/bench/playground.sh [target-dir]` (lands in `vouch/playgrounds/playground`, gitignored;
+the target is wiped and re-seeded, and an existing directory that is not a previous playground is
+refused unless `--force` is passed as the second argument), open Claude Code in the created folder with
 `claude --plugin-dir <path to vouch>`, and paste the prompt below as your first message.
 
 ## Prompt for the working session

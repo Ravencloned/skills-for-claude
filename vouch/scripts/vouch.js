@@ -12,7 +12,7 @@
  *   node vouch.js start          SessionStart
  *   node vouch.js invoke <tier>  called from SKILL.md dynamic context
  *   node vouch.js impossible <what> [evidence]
- *   node vouch.js handoff | report [session] | status | reset [model] | verify [session]
+ *   node vouch.js handoff | report [session] | status | reset [model] | verify [session] | help
  *
  * Exit codes follow the Claude Code hook contract: 0 = ok (JSON on stdout is honoured),
  * 2 = block (stderr is the reason). Nothing here ever costs a model call.
@@ -45,7 +45,20 @@ const DEFAULTS = {
 
 // ---------------------------------------------------------------- io helpers
 function readStdin() {
-  try { const buf = fs.readFileSync(0, 'utf8'); return buf.trim() ? JSON.parse(buf) : {}; } catch (e) { return {}; }
+  // a hook always gets an object; anything else on stdin (null, a string, an array) is treated as empty input
+  try { const buf = fs.readFileSync(0, 'utf8'); const v = buf.trim() ? JSON.parse(buf) : {}; return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (e) { return {}; }
+}
+function globalHome() { return process.env.VOUCH_HOME || path.join(os.homedir(), '.claude', 'vouch'); }
+// a session id (or a CLI session argument) is a file name under .vouch/sessions/, never a path
+function safeName(s) { return String(s).replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 80) || 'x'; }
+// vouch.config.json overrides one level deep: {"tiers": {"full": 900}} keeps the default and restricted thresholds
+function mergeCfg(base, over) {
+  const o = Object.assign({}, base);
+  for (const k of Object.keys(over || {})) {
+    const nested = base[k] && typeof base[k] === 'object' && !Array.isArray(base[k]) && over[k] && typeof over[k] === 'object' && !Array.isArray(over[k]);
+    o[k] = nested ? Object.assign({}, base[k], over[k]) : over[k];
+  }
+  return o;
 }
 function readJson(p, fallback) { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return fallback; } }
 function sleepMs(ms) { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch (e) { const t = Date.now() + ms; while (Date.now() < t) { /* spin */ } } }
@@ -80,9 +93,9 @@ function elapsedMs() { return Number(process.hrtime.bigint() - T0) / 1e6; }
 function ctx(input) {
   const projectDir = process.env.CLAUDE_PROJECT_DIR || input.cwd || process.cwd();
   const vouchDir = path.join(projectDir, '.vouch');
-  const globalDir = process.env.VOUCH_HOME || path.join(os.homedir(), '.claude', 'vouch');
-  const sessionId = input.session_id || process.env.CLAUDE_SESSION_ID || 'cli';
-  const cfg = Object.assign({}, DEFAULTS, readJson(path.join(projectDir, 'vouch.config.json'), {}));
+  const globalDir = globalHome();
+  const sessionId = safeName(input.session_id || process.env.CLAUDE_SESSION_ID || 'cli');
+  const cfg = mergeCfg(DEFAULTS, readJson(path.join(projectDir, 'vouch.config.json'), {}));
   return {
     projectDir, vouchDir, globalDir, sessionId, cfg,
     ledger: path.join(vouchDir, 'sessions', sessionId + '.jsonl'),
@@ -97,8 +110,12 @@ function secret(c) {
   try { return fs.readFileSync(c.secretPath, 'utf8').trim(); } catch (e) {
     fs.mkdirSync(c.globalDir, { recursive: true });
     const s = crypto.randomBytes(32).toString('hex');
-    fs.writeFileSync(c.secretPath, s, { mode: 0o600 });
-    return s;
+    // exclusive create: two first hooks racing here end up with the same secret instead of voiding
+    // each other's receipts (the 0600 mode applies on POSIX; Windows ignores it)
+    try { fs.writeFileSync(c.secretPath, s, { mode: 0o600, flag: 'wx' }); return s; } catch (err) {
+      if (err && err.code === 'EEXIST') { try { return fs.readFileSync(c.secretPath, 'utf8').trim(); } catch (e2) { /* fall through */ } }
+      throw err;
+    }
   }
 }
 // hash-chained HMAC: each receipt signs its own content AND the signature of the receipt it was
@@ -215,37 +232,97 @@ function summary(c, model) {
 // ---------------------------------------------------------------- receipts
 const FILE_TOOLS = new Set(['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
 const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
-const TEST_PATH = /(^|[\\/._-])(test|tests|spec|specs|__tests__)([\\/._-]|$)/i;
+const SHELL_TOOLS = new Set(['Bash', 'PowerShell']);
+function isShell(r) { return SHELL_TOOLS.has(r.tool); }
+// a test path is a path segment named test/tests/spec/specs/__tests__, or a code file whose name carries
+// test/spec with a dot or underscore delimiter (a.test.js, test_a.py, a_test.go). Hyphenated artifact
+// names (test-results/, spec-report.html) and non-code files (test.log) are not tests.
+const TEST_DIR = /(^|[\\/])(test|tests|spec|specs|__tests__)([\\/]|$)/i;
+const TEST_FILE = /^(?:.*[._])?(?:test|tests|spec|specs)(?:[._].*)?\.(?:c|cc|cpp|cs|dart|el|erl|ex|exs|go|hs|java|jl|js|jsx|cjs|mjs|kt|kts|lua|ml|php|pl|py|r|rb|rs|scala|sh|swift|ts|tsx|cts|mts|vue|svelte|zig)$/i;
+function isTestPath(rel) { rel = String(rel || '').replace(/\\/g, '/'); return TEST_DIR.test(rel) || TEST_FILE.test(rel.split('/').pop()); }
+// the path a rule judges: relative to the project when the file is inside it (the project's own folder
+// name, my-test-app, is never a test folder), the basename otherwise
+function rulePath(c, p) { return underProject(c, p) ? path.relative(c.projectDir, p) : path.basename(p); }
 const TEST_SKIP = /\b(it|test|describe)\.(skip|only)\s*\(|\bx(it|test|describe)\s*\(|@pytest\.mark\.(skip|xfail)|\bpytest\.skip\(|\bunittest\.skip|@Ignore\b|@Disabled\b|#\[ignore\]|\bt\.Skip\(/;
-// one shell statement only: never let the match run across a newline or a separator
-const TEST_RM = /\brm\b[^|;&\n]*\b(test|tests|spec|specs|__tests__)\b|\bgit\s+rm\b[^|;&\n]*\b(test|tests|spec)\b/i;
 
-const READ_CMD = /(^|[;&|]\s*)(cat|head|tail|less|more|bat|type|Get-Content|gc|sed\s+-n|awk|nl|wc)\b/;
+// a Git Bash /c/Users/... path on Windows is C:/Users/...; node alone would resolve it to C:\c\Users\...
+function absPath(c, t) {
+  t = String(t);
+  if (process.platform === 'win32') { const m = /^\/([a-zA-Z])\/(.*)$/.exec(t); if (m) t = m[1].toUpperCase() + ':/' + m[2]; }
+  return path.isAbsolute(t) ? t : path.join(c.projectDir, t);
+}
+// shell words: "..." and '...' stay one token and backslash escapes are removed, so a path with a space
+// ("src/my file.js", src/my\ file.js) is one path
+function shellTokens(s) {
+  const toks = []; const re = /"((?:[^"\\]|\\.)*)"|'([^']*)'|((?:[^\s"'\\]|\\.)+)/g; let m;
+  while ((m = re.exec(String(s)))) toks.push(m[1] != null ? m[1].replace(/\\(.)/g, '$1') : m[2] != null ? m[2] : m[3].replace(/\\(.)/g, '$1'));
+  return toks;
+}
+// one shell target: a quoted string or an unquoted run (backslash-escaped characters included)
+const TARGET = '("(?:[^"\\\\]|\\\\.)*"|\'[^\']*\'|(?:[^\\s;&|<>"\'\\\\]|\\\\.)+)';
+function unq(t) { t = String(t || ''); if (/^".*"$/s.test(t) || /^'.*'$/s.test(t)) t = t.slice(1, -1); return t.replace(/\\(.)/g, '$1'); }
 // shell writes: redirections, tee, in-place sed/perl, cp/mv onto a target. These are edits too:
 // they advance the last-edit clock, get file receipts, and are subject to the grounding lock.
 function shellWriteTargets(c, cmd) {
   const out = new Set();
-  const add = (t) => { if (!t) return; t = t.replace(/^["']|["']$/g, ''); if (!t || t.startsWith('-') || t === '/dev/null' || /[*?]/.test(t)) return; out.add(path.isAbsolute(t) ? t : path.join(c.projectDir, t)); };
+  const add = (t) => { t = unq(t); if (!t || t.startsWith('-') || t === '/dev/null' || /[*?]/.test(t)) return; out.add(absPath(c, t)); };
   let m;
-  const re1 = /(?:^|[^<>&|])(?:>>?|&>)\s*([^\s;&|<>]+)/g;
+  const re1 = new RegExp('(?:^|[^<>&|])(?:>>?|&>)\\s*' + TARGET, 'g');
   while ((m = re1.exec(cmd))) add(m[1]);
-  const re2 = /\btee\s+(?:-a\s+)?([^\s;&|<>]+)/g;
+  const re2 = new RegExp('\\btee\\s+(?:-a\\s+)?' + TARGET, 'g');
   while ((m = re2.exec(cmd))) add(m[1]);
-  const re3 = /\b(?:sed|perl)\s+(?:-[a-zA-Z]*i[a-zA-Z]*(?:\S*)?\s+)(?:-e\s+)?(?:'[^']*'|"[^"]*"|\S+)\s+([^\s;&|<>]+)/g;
+  const re3 = new RegExp('\\b(?:sed|perl)\\s+(?:-[a-zA-Z]*i[a-zA-Z]*(?:\\S*)?\\s+)(?:-e\\s+)?(?:\'[^\']*\'|"[^"]*"|\\S+)\\s+' + TARGET, 'g');
   while ((m = re3.exec(cmd))) add(m[1]);
-  const re4 = /\b(?:cp|mv)\s+(?:-\S+\s+)*\S+\s+([^\s;&|<>]+)/g;
+  const re4 = new RegExp('\\b(?:cp|mv)\\s+(?:-\\S+\\s+)*(?:"[^"]*"|\'[^\']*\'|\\S+)\\s+' + TARGET, 'g');
   while ((m = re4.exec(cmd))) add(m[1]);
   return [...out].slice(0, 20);
 }
+// files a shell command READS: the tokens after a read verb (cat, head, sed -n, ...) inside that verb's
+// own statement. `cat a.js && ls -la b.js` reads a.js only; wc, ls, stat never show content.
+const READ_VERBS = new Set(['cat', 'head', 'tail', 'less', 'more', 'bat', 'type', 'get-content', 'gc', 'awk', 'sed']);
 function shellReadPaths(c, cmd) {
   const found = new Set();
-  for (const tok of cmd.split(/\s+/)) {
-    const t = tok.replace(/^["']|["']$/g, '');
-    if (!t || t.startsWith('-') || /[*?]/.test(t)) continue;
-    const p = path.isAbsolute(t) ? t : path.join(c.projectDir, t);
-    try { if (fs.statSync(p).isFile()) found.add(p); } catch (e) { /* not a file */ }
+  for (const stmt of String(cmd).split(/\|\|?|&&?|;|\n/)) {
+    const toks = shellTokens(stmt);
+    const vi = toks.findIndex((t) => READ_VERBS.has(path.basename(t).toLowerCase()));
+    if (vi === -1) continue;
+    const verb = path.basename(toks[vi]).toLowerCase();
+    const flags = toks.slice(vi + 1).filter((t) => t.startsWith('-'));
+    if (verb === 'sed' && (!flags.some((f) => /^-[a-zA-Z]*n/.test(f)) || flags.some((f) => /^-[a-zA-Z]*i/.test(f)))) continue;
+    for (const t of toks.slice(vi + 1)) {
+      if (!t || t.startsWith('-') || /[*?]/.test(t)) continue;
+      const p = absPath(c, t);
+      try { if (fs.statSync(p).isFile()) found.add(p); } catch (e) { /* not a file */ }
+    }
   }
   return [...found].slice(0, 20);
+}
+// targets of every rm / git rm statement, resolved; a glob keeps its literal prefix (rm tests/*.js names tests/)
+function rmTargets(c, cmd) {
+  const out = [];
+  const re = /\brm\s+([^|;&\n]*)/g; let m;
+  while ((m = re.exec(String(cmd)))) {
+    for (const t of shellTokens(m[1])) {
+      if (!t || t.startsWith('-')) continue;
+      const glob = /[*?]/.test(t);
+      const p = absPath(c, t.replace(/[*?]+/g, 'x'));
+      let exists = false;
+      try { fs.statSync(glob ? path.dirname(p) : p); exists = true; } catch (e) { /* nothing there */ }
+      out.push({ raw: t, path: p, exists });
+    }
+  }
+  return out.slice(0, 40);
+}
+function underDir(dir, p) { const n = (x) => path.resolve(String(x)).replace(/\\/g, '/').toLowerCase(); return n(p) === n(dir) || n(p).startsWith(n(dir) + '/'); }
+// the record itself: a command that reads the receipt-signing secret, or writes or deletes under the
+// ledger directories, is tampering with the evidence rather than doing the task
+function stateDirHit(c, cmd) {
+  if (/(?:\.claude[\\/]+vouch|\$\{?VOUCH_HOME\}?)[\\/]+secret\b/i.test(cmd)) return 'reads the receipt-signing secret';
+  if (shellTokens(cmd).some((t) => !t.startsWith('-') && !/[*?]/.test(t) && samePath(absPath(c, t), c.secretPath))) return 'reads the receipt-signing secret';
+  const targets = shellWriteTargets(c, cmd).concat(rmTargets(c, cmd).map((t) => t.path));
+  const hit = targets.find((p) => underDir(c.globalDir, p) || underDir(c.vouchDir, p));
+  if (hit) return `writes or deletes under the ledger directory ${underDir(c.globalDir, hit) ? c.globalDir : c.vouchDir}`;
+  return null;
 }
 
 function makeReceipt(input, ok) {
@@ -258,12 +335,16 @@ function makeReceipt(input, ok) {
     r.cmd = String(ti.command || '').slice(0, 4000);
     r.exit = ok ? 0 : 1;
     r.hash = sha16(tool + '\n' + r.cmd);
-  } else if (FILE_TOOLS.has(tool) || tool === 'Grep' || tool === 'Glob') {
-    r.path = ti.file_path || ti.notebook_path || ti.path || null;
+  } else if (FILE_TOOLS.has(tool)) {
+    r.path = ti.file_path || ti.notebook_path || null;
     if (r.path) r.sha = fileSha(r.path);
-    if (tool === 'Grep') r.cmd = 'grep:' + String(ti.pattern || '').slice(0, 120);
-    if (tool === 'Glob') r.cmd = 'glob:' + String(ti.pattern || '').slice(0, 120);
-    r.hash = sha16(tool + '\n' + (r.path || '') + '\n' + (r.cmd || '') + '\n' + (r.sha || ''));
+    r.hash = sha16(tool + '\n' + (r.path || '') + '\n\n' + (r.sha || ''));
+  } else if (tool === 'Grep' || tool === 'Glob') {
+    // a search shows matching lines or names, never a file's content: no path/sha pair the lock could
+    // consume, and no cmd a claim could name
+    r.query = String(ti.pattern || '').slice(0, 120);
+    if (ti.path) r.target = String(ti.path);
+    r.hash = sha16(tool + '\n' + (r.target || '') + '\n' + r.query);
   } else {
     r.hash = sha16(tool + '\n' + JSON.stringify(ti).slice(0, 400));
   }
@@ -285,8 +366,9 @@ function cmdReceiptHook(input, event) {
   // a shell read (cat, head, sed -n, ...) of an existing file is a read of its current content:
   // give each such file its own receipt so the grounding lock honours it
   let prevSig = r.sig;
-  const written = ok && r.cmd ? shellWriteTargets(c, r.cmd).filter((p) => fileSha(p) !== null) : [];
-  if (ok && r.cmd && READ_CMD.test(r.cmd)) {
+  const shell = ok && r.cmd && isShell(r);
+  const written = shell ? shellWriteTargets(c, r.cmd).filter((p) => fileSha(p) !== null) : [];
+  if (shell) {
     for (const p of shellReadPaths(c, r.cmd)) {
       if (written.some((w) => samePath(w, p))) continue; // "cat > file" is a write, not a read
       const fr = { kind: 'receipt', ts: now(), tool: 'Bash', ok: true, path: p, sha: fileSha(p), via: 'shell-read' };
@@ -308,7 +390,7 @@ function cmdReceiptHook(input, event) {
   const model = remember(input, state);
   const warnings = [];
 
-  if (r.cmd && (r.tool === 'Bash' || r.tool === 'PowerShell')) {
+  if (r.cmd && isShell(r)) {
     state.recent_cmds.push({ cmd: r.cmd, ok, edit_ts: state.last_edit_ts });
     state.recent_cmds = state.recent_cmds.slice(-c.cfg.loop_window);
     const w = state.recent_cmds;
@@ -320,13 +402,13 @@ function cmdReceiptHook(input, event) {
       state.recent_cmds = [];
     }
     state._editWarned = false;
+    state.recent_edits = []; // a command run between edits restarts the edit window: edit/run/edit/run is the honest path
   }
   if (EDIT_TOOLS.has(r.tool)) {
     state.last_edit_ts = r.ts;
     state.recent_edits.push(r.path || '');
     state.recent_edits = state.recent_edits.slice(-c.cfg.edit_window);
-    const cmdsSinceEdit = state.recent_cmds.filter((x) => x.edit_ts === state.last_edit_ts).length;
-    if (state.recent_edits.length === c.cfg.edit_window && state.recent_edits.every((p) => p === r.path) && cmdsSinceEdit === 0 && !state._editWarned) {
+    if (state.recent_edits.length === c.cfg.edit_window && state.recent_edits.every((p) => p === r.path) && !state._editWarned) {
       state._editWarned = true;
       state.stuck++;
       appendLine(c.ledger, { kind: 'loop', ts: now(), rule: 'same-file-no-test', detail: r.path, wager_lost: c.cfg.loop_loss });
@@ -359,10 +441,21 @@ function cmdLock(input) {
   if (seenBefore(state, 'l:' + (input.tool_use_id || sha16(tool + JSON.stringify(ti))))) { saveState(c, state); return; }
   const model = remember(input, state);
   const dev = process.env.VOUCH_DEV === '1';
+  // the record is off limits in every mode: denied while armed, a permission prompt otherwise
+  const recordGuard = (what) => {
+    appendLine(c.ledger, { kind: 'incident', ts: now(), claim: 'record-guard: ' + trunc(what, 120), missing: 'VOUCH_DEV=1', wager_lost: 0, model });
+    saveState(c, state);
+    const reason = `vouch record guard: this ${what}. The ledger, bankroll and signing secret are the evidence, not the task; ask the user (VOUCH_DEV=1 lifts this for engine work).`;
+    return state.invoked ? deny('PreToolUse', reason) : ask('PreToolUse', reason);
+  };
 
-  if (tool === 'Bash' || tool === 'PowerShell') {
+  if (SHELL_TOOLS.has(tool)) {
     const cmd = String(ti.command || '');
-    if (TEST_RM.test(cmd)) {
+    const tamper = dev ? null : stateDirHit(c, cmd);
+    if (tamper) return recordGuard('command ' + tamper);
+    // deleting a test path that exists under the project (rm tests/, rm src/a.test.js, rm tests/*.js)
+    const rmTests = rmTargets(c, cmd).filter((t) => t.exists && underProject(c, t.path) && isTestPath(path.relative(c.projectDir, t.path)));
+    if (rmTests.length) {
       settle(c, model, 'penalty', c.cfg.test_protect_loss, { claim: 'delete tests: ' + trunc(cmd, 80), missing: 'user authorization' });
       appendLine(c.ledger, { kind: 'incident', ts: now(), claim: 'test-protect: ' + trunc(cmd, 120), missing: 'user authorization', wager_lost: c.cfg.test_protect_loss, model });
       saveState(c, state);
@@ -373,7 +466,7 @@ function cmdLock(input) {
       if (c.cfg.lock_scope !== 'all' && !underProject(c, p)) continue;
       const cur = fileSha(p);
       if (cur === null) continue;
-      if (TEST_PATH.test(p)) {
+      if (isTestPath(rulePath(c, p))) {
         settle(c, model, 'penalty', c.cfg.test_protect_loss, { claim: 'overwrite test via shell: ' + path.basename(p), missing: 'user authorization' });
         appendLine(c.ledger, { kind: 'incident', ts: now(), claim: 'test-protect: shell write to ' + p, missing: 'user authorization', wager_lost: c.cfg.test_protect_loss, model });
         saveState(c, state);
@@ -393,10 +486,17 @@ function cmdLock(input) {
   }
   const p = ti.file_path || ti.notebook_path;
   if (!p) return;
+  // the secret is never read through a tool; the ledger dirs are never written through one
+  if (tool === 'Read') {
+    if (!dev && samePath(p, c.secretPath)) { appendLine(c.ledger, { kind: 'incident', ts: now(), claim: 'record-guard: Read ' + p, missing: 'VOUCH_DEV=1', wager_lost: 0, model }); saveState(c, state); return deny('PreToolUse', 'vouch record guard: the receipt-signing secret is not readable by the model.'); }
+    return;
+  }
+  if (!dev && (underDir(c.globalDir, p) || underDir(c.vouchDir, p))) return recordGuard(`${tool} targets ${p}`);
 
   if (state.invoked && !dev) {
     const norm = p.replace(/\\/g, '/');
-    if (/\/\.vouch\/|\/skills\/vouch\/|\/plugins\/[^/]*vouch|\/agents\/vouch-|\/settings(\.local)?\.json$|\/hooks\/hooks\.json$/.test(norm)) {
+    // the engine, the agent, and Claude Code's own hook settings; a settings.json elsewhere in the project is the user's
+    if (/\/\.vouch\/|\/skills\/vouch\/|\/plugins\/[^/]*vouch|\/agents\/vouch-|\/\.claude\/settings(\.local)?\.json$|\/\.claude\/hooks\/hooks\.json$/.test(norm)) {
       appendLine(c.ledger, { kind: 'incident', ts: now(), claim: 'config-guard: ' + norm, missing: 'VOUCH_DEV=1', wager_lost: 0, model });
       saveState(c, state);
       return deny('PreToolUse', 'vouch config-guard: the engine, ledger, and hook settings are read-only while vouch is armed. Ask the user to change them.');
@@ -404,7 +504,7 @@ function cmdLock(input) {
   }
 
   const content = String(ti.new_string || ti.content || (Array.isArray(ti.edits) ? ti.edits.map((e) => e.new_string).join('\n') : ''));
-  if (TEST_PATH.test(p) && TEST_SKIP.test(content)) {
+  if (isTestPath(rulePath(c, p)) && TEST_SKIP.test(content)) {
     settle(c, model, 'penalty', c.cfg.test_protect_loss, { claim: 'skip test in ' + path.basename(p), missing: 'user authorization' });
     appendLine(c.ledger, { kind: 'incident', ts: now(), claim: 'test-protect: skip/only in ' + p, missing: 'user authorization', wager_lost: c.cfg.test_protect_loss, model });
     saveState(c, state);
@@ -530,7 +630,7 @@ const TEST_LANGUAGE = /\b(tests?|assertions?|suite|specs?|checks?)\b[^\n]{0,60}\
 function autoBacking(c, state, msg) {
   const { receipts } = verifiedReceipts(c);
   const fresh = receipts.filter((r) => r.ts > state.last_edit_ts);
-  const testRuns = fresh.filter((r) => r.cmd && !r.via && TEST_CMD.test(r.cmd));
+  const testRuns = fresh.filter((r) => isShell(r) && r.cmd && !r.via && TEST_CMD.test(r.cmd));
   const greenRun = testRuns.filter((r) => r.ok).pop();
   const anyRun = testRuns[testRuns.length - 1];
   // language about tests is backed only by a test run: green for a pass claim, any run if the
@@ -542,7 +642,7 @@ function autoBacking(c, state, msg) {
   }
   if (greenRun) return greenRun;
   const t = msg.toLowerCase();
-  for (const r of fresh.filter((x) => x.ok && x.cmd && !x.via).reverse()) {
+  for (const r of fresh.filter((x) => x.ok && isShell(x) && x.cmd && !x.via).reverse()) {
     const words = r.cmd.toLowerCase().replace(/^cd\s+\S+\s*(&&|;)\s*/, '').split(/\s+/).filter((w) => w.length > 1 && !w.startsWith('-')).slice(0, 2);
     if (words.length === 2 && t.includes(words.join(' '))) return r;
   }
@@ -555,28 +655,30 @@ function resolveReceipt(c, spec, state, claimText) {
   const tail = broken ? ` (ledger holds invalid receipts since ${new Date(broken).toISOString()}; those are void)` : '';
   spec = spec.trim().replace(/^`|`$/g, '');
   if (/^none$/i.test(spec)) return { ok: false, why: 'no receipt given' };
-  // compound receipts ("file:src/a.js + cmd:npm test", "cmd:x and cmd:y"): every part must resolve
-  const parts = spec.split(/\s+\+\s+|\s*;\s*|\s+and\s+(?=(?:cmd|file|read):)/i).map((s) => s.trim()).filter(Boolean);
+  // compound receipts ("file:src/a.js + cmd:npm test", "cmd:x; cmd:y", "cmd:x and cmd:y"): every part
+  // must resolve. A ";" or "and" followed by narrative ("cmd:npm test; 12 passed") is not a second part.
+  const parts = spec.split(/\s+\+\s+|\s*;\s*(?=(?:cmd|command|ran|run|file|read|path):)|\s+and\s+(?=(?:cmd|file|read):)/i).map((s) => s.trim()).filter(Boolean);
   if (parts.length > 1) {
     let last = null;
     for (const p of parts) { const r = resolveReceipt(c, p, state, claimText); if (!r.ok) return r; last = r; }
     return last;
   }
   let m;
+  const norm = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const firstWord = (cmd) => norm(cmd).replace(/^cd\s+\S+\s*(?:&&|;)\s*/, '').split(' ')[0];
   if ((m = /^(?:cmd|command|ran|run):\s*(.+)$/i.exec(spec))) {
-    // models append narrative after the command ("npm test -> output # pass 4"); match on the
-    // longest leading word-prefix of the receipt that some command actually contains
-    const full = m[1].trim().toLowerCase().replace(/^`|`$/g, '');
-    const words = full.split(/\s+/);
-    let needle = full, hits = [];
-    // never shorten to a single word unless the receipt itself is one word ("npm" must not match "npm test")
-    for (let n = words.length; n >= Math.min(2, words.length); n--) {
-      const cand = words.slice(0, n).join(' ').replace(/[→"'`(),:]+$/g, '');
-      if (cand.length < 3) break;
-      hits = receipts.filter((r) => r.cmd && r.cmd.toLowerCase().includes(cand));
-      if (hits.length) { needle = cand; break; }
-    }
-    if (!hits.length) return { ok: false, why: `no command containing "${trunc(words.slice(0, 3).join(' '), 40)}" ran this session${tail}` };
+    // models append narrative after the command ("npm test -> output # pass 4", "npm test; 12 passed"):
+    // the receipt is the text up to the first narrative boundary, and the WHOLE of it must be part of
+    // one command that ran. A receipt naming test/b.js is not backed by a run of test/a.js, and
+    // "npm test -- --grep refund" is not backed by a bare "npm test".
+    const stripped = m[1].trim().replace(/^`|`$/g, '').split(/\s*(?:->|→|=>|;|\(|"|“|”|\bexit(?:ed| code)?\b|\boutput\b|\bprint(?:s|ed)?\b|\bshow(?:s|ed)?\b|\breturn(?:s|ed)?\b|\bgave\b|\breport(?:s|ed)?\b|:\s)/i)[0];
+    const needle = norm(stripped).replace(/[.,;:!`']+$/g, '');
+    if (needle.length < 2) return { ok: false, why: 'the cmd: receipt names no command' };
+    const words = needle.split(' ');
+    const shell = receipts.filter((r) => isShell(r) && r.cmd);
+    // a one-word receipt ("pytest") names the program that ran, not any substring of any command
+    const hits = words.length === 1 ? shell.filter((r) => firstWord(r.cmd) === needle || norm(r.cmd) === needle) : shell.filter((r) => norm(r.cmd).includes(needle));
+    if (!hits.length) return { ok: false, why: `no command containing "${trunc(needle, 40)}" ran this session${tail}` };
     const okHits = hits.filter((r) => r.ok);
     if (!okHits.length) {
       // a claim that REPORTS a failure is backed by the failed run itself ("0 passed, 1 failed")
@@ -591,7 +693,7 @@ function resolveReceipt(c, spec, state, claimText) {
   if ((m = /^(?:file|read|path):\s*(.+?)(?:@([0-9a-f]{4,16}))?\s*$/i.exec(spec))) {
     // "file:src/a.js line 1", "read:src/a.js:12", "file:`src/a.js`" all mean src/a.js
     const raw = m[1].replace(/^`|`$/g, '').replace(/(?:[,\s]+(?:at\s+)?lines?\s+\d+(?:-\d+)?|:\d+(?:-\d+)?)\s*$/i, '').trim();
-    const p = path.isAbsolute(raw) ? raw : path.join(c.projectDir, raw);
+    const p = absPath(c, raw);
     const sha = (m[2] || '').toLowerCase();
     const cur = fileSha(p);
     const hits = receipts.filter((r) => r.path && samePath(r.path, p));
@@ -604,7 +706,7 @@ function resolveReceipt(c, spec, state, claimText) {
   // free-form receipt ("ran npm test, output shows # pass 4"): accept it if it names a command
   // that actually succeeded after the last edit. Formatting is not the product; evidence is.
   const text = spec.toLowerCase();
-  const fresh = receipts.filter((r) => r.ok && r.cmd && !r.via && r.ts > state.last_edit_ts);
+  const fresh = receipts.filter((r) => r.ok && isShell(r) && r.cmd && !r.via && r.ts > state.last_edit_ts);
   let best = null;
   for (const r of fresh) {
     const words = r.cmd.toLowerCase().replace(/^cd\s+\S+\s*(&&|;)\s*/, '').split(/\s+/).filter((w) => w.length > 1 && !w.startsWith('-')).slice(0, 3);
@@ -779,7 +881,7 @@ function cmdImpossible(args) {
 function cmdHandoff() {
   const c = cliCtx();
   const rows = readLines(c.ledger);
-  const cmds = rows.filter((r) => r.kind === 'receipt' && r.cmd).slice(-15).map((r) => `- ${r.ok ? 'ok ' : 'FAIL'} ${trunc(r.cmd, 100)}`);
+  const cmds = rows.filter((r) => r.kind === 'receipt' && r.cmd && SHELL_TOOLS.has(r.tool)).slice(-15).map((r) => `- ${r.ok ? 'ok ' : 'FAIL'} ${trunc(r.cmd, 100)}`);
   const edits = [...new Set(rows.filter((r) => r.kind === 'receipt' && EDIT_TOOLS.has(r.tool)).map((r) => r.path))].map((p) => `- ${p}`);
   const unbacked = rows.filter((r) => r.kind === 'incident').slice(-10).map((r) => `- ${trunc(r.claim, 100)} (missing: ${trunc(r.missing, 60)})`);
   const loops = rows.filter((r) => r.kind === 'loop').map((r) => `- ${r.rule}: ${trunc(r.detail, 80)}`);
@@ -855,7 +957,37 @@ function cmdReport(args) {
   process.stdout.write(lines.join('\n') + '\n');
 }
 
-// ---------------------------------------------------------------- main
+// ---------------------------------------------------------------- usage / main
+function usage() {
+  return [
+    'vouch — receipts, not recall. Signed tool receipts, a grounding lock, a claim guard, a loop monitor, a per-model bankroll.',
+    'usage: node vouch.js <subcommand> [args]',
+    '',
+    'hook subcommands (stdin: Claude Code hook JSON; filesystem only, never a model call; JSON on stdout only when speaking):',
+    '  receipt                      PostToolUse | PostToolUseFailure: sign a receipt for the tool call (shell reads and writes get file receipts); loop monitor',
+    '  lock                         PreToolUse Edit|Write|MultiEdit|NotebookEdit|Bash|Read: grounding lock (no edit without a fresh read), test-protect, record guard, config guard',
+    '  guard                        Stop | SubagentStop | TaskCompleted: match every CLAIM line to a receipt newer than the last edit; block once, settle the wager',
+    '  tier [--armed <level>]       PreToolUse Agent|Edit|Write|MultiEdit (armed mode): enforce the balance tier; --armed arms the session when /vouch ran without its invoke line',
+    '  prompt [--armed <level>]     UserPromptSubmit (armed mode): the balance/tier/turn line, in full when something changed, a stub otherwise',
+    '  start                        SessionStart: one line with the model\'s balance, tier, hit rate, last loss and rule 0',
+    '',
+    'cli subcommands:',
+    '  invoke [lenient|default|strict]   arm the session (run by SKILL.md): strictness, turn budget; writes the invoke row',
+    '  impossible "<what>" ["<evidence>"] record an IMPOSSIBLE for every agent in the project (.vouch/impossible.jsonl)',
+    '  handoff                      write .vouch/handoff-<session>.md from the ledger (commands tried, files edited, incidents, loops)',
+    '  status                       per-model bankroll table (balance, tier, backed/unbacked, hit rate)',
+    '  report [session]             turns, tokens, claims backed/unbacked, lock denials, loops, blocks, coins lost (needs the transcript path from a hook)',
+    '  verify [session]             receipt-chain integrity: ok, or TAMPERED with the first invalid receipt (exit 1)',
+    '  reset [model]                delete one model\'s bankroll entry, or all of them',
+    '  help                         this text',
+    '',
+    'environment: CLAUDE_PROJECT_DIR (state root; default cwd) | CLAUDE_SESSION_ID (ledger name for cli calls; default "cli")',
+    '  VOUCH_HOME=<dir>             bankroll, signing secret and errors.log (default ~/.claude/vouch); tests and benches point it at a scratch dir',
+    '  VOUCH_DEV=1                  lift the config guard and the record guard while developing the engine itself',
+    'state: .vouch/sessions/<session>.jsonl (ledger) .state.json | .vouch/bankroll.json (mirror) | .vouch/impossible.jsonl | <VOUCH_HOME>/bankroll.json | <VOUCH_HOME>/secret',
+    'config: vouch.config.json in the project root, keys in ledger/SCHEMA.md (nested keys such as tiers and max_turns merge one level deep)',
+  ].join('\n');
+}
 function main() {
   const [cmd, ...args] = process.argv.slice(2);
   try {
@@ -873,10 +1005,11 @@ function main() {
       case 'reset': return cmdReset(args);
       case 'verify': return cmdVerify(args);
       case 'report': return cmdReport(args);
-      default: process.stdout.write('usage: vouch.js receipt|lock|tier|guard|start|prompt|invoke|impossible|handoff|status|reset|verify|report\n');
+      case 'help': case '--help': case '-h': return process.stdout.write(usage() + '\n');
+      default: process.stdout.write(usage() + '\n'); process.exitCode = cmd ? 1 : 0;
     }
   } catch (e) {
-    try { fs.appendFileSync(path.join(os.homedir(), '.claude', 'vouch', 'errors.log'), new Date().toISOString() + ' ' + cmd + ' ' + (e && e.stack || e) + '\n'); } catch (_) { /* ignore */ }
+    try { const dir = globalHome(); fs.mkdirSync(dir, { recursive: true }); fs.appendFileSync(path.join(dir, 'errors.log'), new Date().toISOString() + ' ' + cmd + ' ' + (e && e.stack || e) + '\n'); } catch (_) { /* ignore */ }
     process.exit(0); // a broken hook must never break the session
   }
 }

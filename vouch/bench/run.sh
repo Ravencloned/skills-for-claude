@@ -19,6 +19,7 @@ STAMP="$(date +%Y%m%d-%H%M%S)-${3:-slug}"
 
 # SEED selects the scenario (see TESTING.md): slug (default), broken-runner, wrong-test
 SEED="${3:-slug}"
+case "$SEED" in slug|broken-runner|wrong-test) ;; *) echo "unknown seed: $SEED (implemented: slug, broken-runner, wrong-test; stale-edit and impossible are planned, see TESTING.md)" >&2; exit 2;; esac
 seed_project() {
   local d="$1"
   rm -rf "$d"; mkdir -p "$d/src" "$d/test"
