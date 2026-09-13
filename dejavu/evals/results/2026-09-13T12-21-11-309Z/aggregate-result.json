@@ -1,0 +1,652 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.270",
+  "startedAt": "2026-09-13T12:21:11.309Z",
+  "durationSeconds": 1092,
+  "costUsd": 4.849442,
+  "partial": false,
+  "suite": {
+    "root": "/mnt/c/Users/Yash Nautiyal/Desktop/Skills for claude/dejavu",
+    "ablation": "with-without",
+    "threshold": 1,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "dejavu",
+        "version": "0.1.0",
+        "path": "/mnt/c/Users/Yash Nautiyal/Desktop/Skills for claude/dejavu"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "Plan mode offers the check once and gates ExitPlanMode until it ran or was skipped",
+      "dir": "evals/plan-mode-offers-and-gates",
+      "source": "mixed",
+      "promptMarkdown": "This project is a small Express API (`src/server.js`). Enter plan mode and write a plan for adding\nper-client rate limiting to it, then exit plan mode so I can approve the plan. Do not implement\nanything. Finish by telling me in one paragraph what the plan is and whether a prior-art check was\nrun or skipped.",
+      "runsPerCase": 3,
+      "timeoutSeconds": 300,
+      "maxTurns": 30,
+      "graders": [
+        {
+          "name": "check-or-skip-recorded",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Bash",
+            "input_match": "dejavu\\.js.* (open|report|skip)",
+            "min": 1
+          }
+        },
+        {
+          "name": "offer-was-made",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "AskUserQuestion",
+            "min": 1
+          }
+        },
+        {
+          "name": "plan-mode-entered",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "EnterPlanMode",
+            "min": 1
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 8,
+            "costUsd": 0.2511595,
+            "judgeCostUsd": 0,
+            "durationSeconds": 51,
+            "startedAt": "2026-09-13T12:21:11.518Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-m2G6Yd/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "check-or-skip-recorded",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Bash called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "offer-was-made",
+                "passed": false,
+                "weight": 1,
+                "explanation": "AskUserQuestion called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "plan-mode-entered",
+                "passed": false,
+                "weight": 1,
+                "explanation": "EnterPlanMode called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 6,
+            "costUsd": 0.23824650000000003,
+            "judgeCostUsd": 0,
+            "durationSeconds": 46,
+            "startedAt": "2026-09-13T12:22:02.985Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-OY6xLI/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "check-or-skip-recorded",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Bash called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "offer-was-made",
+                "passed": false,
+                "weight": 1,
+                "explanation": "AskUserQuestion called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "plan-mode-entered",
+                "passed": false,
+                "weight": 1,
+                "explanation": "EnterPlanMode called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 9,
+            "costUsd": 0.312509,
+            "judgeCostUsd": 0,
+            "durationSeconds": 67,
+            "startedAt": "2026-09-13T12:22:48.592Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-NBzA8n/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "check-or-skip-recorded",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Bash called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "offer-was-made",
+                "passed": false,
+                "weight": 1,
+                "explanation": "AskUserQuestion called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "plan-mode-entered",
+                "passed": false,
+                "weight": 1,
+                "explanation": "EnterPlanMode called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 8,
+            "costUsd": 0.291259,
+            "judgeCostUsd": 0,
+            "durationSeconds": 69,
+            "startedAt": "2026-09-13T12:23:55.648Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-CYD89O/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "check-or-skip-recorded",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Bash called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "offer-was-made",
+                "passed": false,
+                "weight": 1,
+                "explanation": "AskUserQuestion called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "plan-mode-entered",
+                "passed": false,
+                "weight": 1,
+                "explanation": "EnterPlanMode called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 9,
+            "costUsd": 0.267475,
+            "judgeCostUsd": 0,
+            "durationSeconds": 58,
+            "startedAt": "2026-09-13T12:25:04.938Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-C6lXJB/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "check-or-skip-recorded",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Bash called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "offer-was-made",
+                "passed": false,
+                "weight": 1,
+                "explanation": "AskUserQuestion called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "plan-mode-entered",
+                "passed": false,
+                "weight": 1,
+                "explanation": "EnterPlanMode called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 8,
+            "costUsd": 0.248272,
+            "judgeCostUsd": 0,
+            "durationSeconds": 56,
+            "startedAt": "2026-09-13T12:26:03.360Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-YCZDiq/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "check-or-skip-recorded",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Bash called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "offer-was-made",
+                "passed": false,
+                "weight": 1,
+                "explanation": "AskUserQuestion called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "plan-mode-entered",
+                "passed": false,
+                "weight": 1,
+                "explanation": "EnterPlanMode called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 0,
+        "passRate": 0,
+        "scoreWithout": 0,
+        "passRateWithout": 0,
+        "delta": 0
+      }
+    },
+    {
+      "name": "A quick check writes a report with a search log and an engine-validated verdict",
+      "dir": "evals/quick-check-writes-a-report",
+      "source": "mixed",
+      "promptMarkdown": "/dejavu quick a token bucket rate limiter middleware for this Express API, keyed per client\n\nWhen the report is written, tell me the verdict, the top matches with their URLs, the\nrecommendation, and where the report is.",
+      "runsPerCase": 3,
+      "timeoutSeconds": 300,
+      "maxTurns": 30,
+      "graders": [
+        {
+          "name": "at-least-five-queries",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Bash",
+            "input_match": "dejavu\\.js.* query",
+            "min": 5
+          }
+        },
+        {
+          "name": "final-message-names-report-path",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "(docs/dejavu/|\\.dejavu/checks/)[A-Za-z0-9._-]+\\.md",
+            "flags": "m",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "final-message-names-verdict",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "\\b(EXISTS|PARTIAL|NOVEL|UNKNOWN)\\b",
+            "flags": "m",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "report-command-ran",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Bash",
+            "input_match": "dejavu\\.js.* report",
+            "min": 1
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 27,
+            "costUsd": 1.2691964999999998,
+            "judgeCostUsd": 0,
+            "durationSeconds": 220,
+            "startedAt": "2026-09-13T12:26:59.052Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-JxTaUO/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "at-least-five-queries",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 6x (expected 5..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "final-message-names-report-path",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched (docs/dejavu/|\\.dejavu/checks/)[A-Za-z0-9._-]+\\.md",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "final-message-names-verdict",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched \\b(EXISTS|PARTIAL|NOVEL|UNKNOWN)\\b",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "report-command-ran",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 2x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.25,
+            "passed": false,
+            "turns": 18,
+            "costUsd": 0.6431635,
+            "judgeCostUsd": 0,
+            "durationSeconds": 309,
+            "startedAt": "2026-09-13T12:30:38.727Z",
+            "error": "timed out after 300s",
+            "tracePath": "/tmp/claude-eval-COFMJC/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "at-least-five-queries",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 9x (expected 5..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "final-message-names-report-path",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in last_message",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "final-message-names-verdict",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in last_message",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "report-command-ran",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Bash called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 25,
+            "costUsd": 1.3281609999999997,
+            "judgeCostUsd": 0,
+            "durationSeconds": 208,
+            "startedAt": "2026-09-13T12:35:48.137Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-kRbwnu/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "at-least-five-queries",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 6x (expected 5..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "final-message-names-report-path",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched (docs/dejavu/|\\.dejavu/checks/)[A-Za-z0-9._-]+\\.md",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "final-message-names-verdict",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched \\b(EXISTS|PARTIAL|NOVEL|UNKNOWN)\\b",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "report-command-ran",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 2x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 0,
+            "costUsd": 0,
+            "judgeCostUsd": 0,
+            "durationSeconds": 2,
+            "startedAt": "2026-09-13T12:39:15.887Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-ganiLW/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "at-least-five-queries",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Bash called 0x (expected 5..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "final-message-names-report-path",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in last_message",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "final-message-names-verdict",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in last_message",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "report-command-ran",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Bash called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 0,
+            "costUsd": 0,
+            "judgeCostUsd": 0,
+            "durationSeconds": 2,
+            "startedAt": "2026-09-13T12:39:18.199Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-pQPvWX/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "at-least-five-queries",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Bash called 0x (expected 5..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "final-message-names-report-path",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in last_message",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "final-message-names-verdict",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in last_message",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "report-command-ran",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Bash called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 0,
+            "costUsd": 0,
+            "judgeCostUsd": 0,
+            "durationSeconds": 2,
+            "startedAt": "2026-09-13T12:39:20.548Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-OzF0CU/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "at-least-five-queries",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Bash called 0x (expected 5..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "final-message-names-report-path",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in last_message",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "final-message-names-verdict",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in last_message",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "report-command-ran",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Bash called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 0.75,
+        "passRate": 0.6666666666666666,
+        "scoreWithout": 0,
+        "passRateWithout": 0,
+        "delta": 0.75
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 2,
+    "casesPassed": 0,
+    "overallScore": 0.375,
+    "overallPassRate": 0.3333333333333333,
+    "meanDelta": 0.375
+  }
+}

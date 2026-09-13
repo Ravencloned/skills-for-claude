@@ -64,12 +64,28 @@ claude plugin eval dejavu --scaffold \
   --allow-tools Bash Read Write Edit WebSearch WebFetch EnterPlanMode ExitPlanMode AskUserQuestion
 ```
 
-Both cases grant Bash (the engine is a Node script), and `claude plugin eval` refuses to run a
+The case grants Bash (the engine is a Node script), and `claude plugin eval` refuses to run a
 shell-granting case where it cannot confine the shell. On Windows (2.1.270, 2026-09-13) there is
 no sandbox backend, so every arm is refused before its first turn: the run reports 0 turns, $0,
-and "sandbox required but unavailable". Run the suite on Linux or macOS (or a Linux CI runner);
-`--scaffold` is required because both cases stage a project with `scaffold.sh`. Without the
-plan-mode tool grants the `plan-mode-entered` grader is withheld from the model and cannot pass.
+and "sandbox required but unavailable". `--scaffold` is required because the case stages a project
+with `scaffold.sh`.
+
+What worked on this machine (2026-09-13): WSL2 Ubuntu 24.04, Claude Code installed there with the
+native installer and logged in once, and `bubblewrap` plus `socat` extracted from their `.deb`
+files into `~/.local` (no sudo; `bwrap` runs unprivileged on the WSL kernel; `socat` needs
+`libwrap0` on `LD_LIBRARY_PATH`). Two more refusals before the first real run: a case's
+`scaffold_script` must live inside its own case folder (`../other-case/scaffold.sh` is rejected as
+a path escape), and the Bash sandbox refuses to run while `~/.docker` contains a symlink (Docker
+Desktop's WSL integration links `contexts` and `features.json` to the Windows profile; setting
+`DOCKER_CONFIG` elsewhere is not enough, the links have to be replaced by copies for the run).
+
+First real run (`evals/results/2026-09-13T12-21-11-309Z`, 18 min, $4.85, twelve runs): the quick
+check case passed 2 of 3 with the plugin (27 and 25 turns, all four graders; the third run hit the
+300 s case timeout at 18 turns with 9 queries logged, now `timeout_seconds: 600`) and 0 of 3 without
+(the `/dejavu` command does not exist without the plugin, so the baseline ends at 0 turns): mean
+score 0.75 with, 0 without, delta +0.75. The plan-mode case read zero on every grader in both arms
+because the headless child has no `EnterPlanMode`, `ExitPlanMode` or `AskUserQuestion` in its tool
+list even when granted; it now lives in `bench/manual-cases/` and is covered by the playground.
 
 ### Interactive kit (`bench/playground.sh`, `bench/evaluate.sh`, `bench/PLAYGROUND.md`)
 
