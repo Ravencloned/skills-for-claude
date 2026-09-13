@@ -11,6 +11,23 @@ Built in one pass per the sequence below. Deviations from the plan, all delibera
 
 Verified: 35/35 pipe-tests (`bash vouch/tests/run.sh`); official validator passes on the skill folder; the project's settings hooks went live mid-session and the grounding lock denied a real edit made from recall (charged claude-fable-5-1 50 coins). Not verified in this session: `/vouch` invocation and the prompt-hook adjudicator (user-only invocation), SubagentStop/TaskCompleted in a real fan-out, the with/without token measurement.
 
+## v0.2.13 (2026-09-13): the ledger is a tree
+
+Live incident during the `dejavu` build (an eleven-agent workflow under vouch normal mode, Windows):
+the moment parallel subagents started appending receipts, two hooks read the same ledger tail and
+both chained onto it. The old verifier treated the second row as tampering and voided every receipt
+after it (`verify`: 2/280 valid), so the grounding lock denied every edit for the rest of the session
+and charged 50 coins each time, for the lead and for every agent. `writeJson` also lost state updates
+to `EPERM` on the rename while another hook held the file (11 entries in `errors.log`).
+
+Fix: a receipt is valid when its own signature checks and its `prev` is the signature of any earlier
+valid row, so concurrent writers fork the chain instead of breaking it; a new receipt chains onto the
+last *valid* row, so a forged or damaged row is ignored rather than becoming the parent of every honest
+receipt after it (forging still needs the secret; deleting a row still voids everything chained on it).
+`writeJson` retries the rename up to eight times with a short sleep. Battery case 22 covers both
+(twelve concurrent receipts, edit allowed afterwards, forged row void while the next receipt stays
+valid). The healed live ledger verified 368/368 under the new rule.
+
 ## v0.2 (2026-09-10): production pass
 
 ### Research connection (the open-weight threat-model report Yash brought)

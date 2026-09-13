@@ -25,7 +25,7 @@ cites the paper or is labelled a hypothesis.
 
 | layer | mechanism | cost to you |
 |---|---|---|
-| receipts | PostToolUse hook signs every Read/Edit/Bash with an HMAC chained to the previous receipt | 0 tokens |
+| receipts | PostToolUse hook signs every Read/Edit/Bash with an HMAC chained to the last valid receipt; parallel subagents fork the chain instead of breaking it | 0 tokens |
 | grounding lock | no edit to a file without a Read of its current content this session | 0 tokens |
 | claim guard | Stop hook matches every claim line to a receipt newer than the last edit; "tests pass" backed by a fresh green test run passes without ceremony; anything unbacked is blocked once with the missing receipt named | one short re-invocation only when a claim is unbacked |
 | loop monitor | same failing command 3x, same file edited 3x without a run: charged | 0 tokens |

@@ -219,4 +219,24 @@ echo "21. hook latency"
 t0=$(date +%s%N); run receipt "$(receiptj PostToolUse Read '{"file_path":"'"$A"'"}')" >/dev/null; t1=$(date +%s%N)
 ms=$(( (t1 - t0) / 1000000 )); [ "$ms" -lt 400 ] && ok "receipt hook ${ms}ms wall" || bad "hook slow" "${ms}ms"
 
+echo "22. parallel subagents append receipts at once: the ledger forks, nothing is voided, the lock honours every read"
+export CLAUDE_SESSION_ID="t9"
+S9='"session_id":"t9","cwd":"'"$CLAUDE_PROJECT_DIR"'","transcript_path":"'"$TMP/none.jsonl"'"'
+for i in $(seq 1 12); do
+  printf '{%s,"tool_use_id":"par%s","hook_event_name":"PostToolUse","tool_name":"Read","agent_id":"ag%s","tool_input":{"file_path":"%s"},"tool_response":{}}' "$S9" "$i" "$i" "$A" | node "$ENGINE" receipt >/dev/null 2>&1 &
+done
+wait
+v=$(node "$ENGINE" verify t9)
+echo "$v" | grep -q '^ok: 12/12' && ok "12 concurrent receipts all valid: $v" || bad "expected ok: 12/12" "$v"
+forks=$(node -e 'const fs=require("fs");const rows=fs.readFileSync(process.argv[1],"utf8").split("\n").filter(Boolean).map(JSON.parse).filter(r=>r.kind==="receipt");console.log(new Set(rows.map(r=>r.prev)).size<rows.length?"forked":"linear")' "$CLAUDE_PROJECT_DIR/.vouch/sessions/t9.jsonl")
+echo "  info $forks ledger (a fork is expected under real concurrency, a linear one is fine too)"
+r=$(printf '{%s,"tool_use_id":"e9","hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"%s","old_string":"1","new_string":"2"}}' "$S9" "$A" | node "$ENGINE" lock; echo "exit=$?")
+echo "$r" | grep -q 'deny' && bad "lock denied an edit after a concurrent read" "$r" || ok "edit allowed after a concurrently recorded read"
+# a forged row (right shape, wrong signature) is void and does not void the rows chained after it
+node -e 'const fs=require("fs");const p=process.argv[1];const rows=fs.readFileSync(p,"utf8").split("\n").filter(Boolean);const last=JSON.parse(rows[rows.length-1]);const forged=Object.assign({},last,{ts:last.ts+1,path:"C:/forged.js",sig:"0000000000000000"});fs.appendFileSync(p,JSON.stringify(forged)+"\n")' "$CLAUDE_PROJECT_DIR/.vouch/sessions/t9.jsonl"
+printf '{%s,"tool_use_id":"after-forge","hook_event_name":"PostToolUse","tool_name":"Read","tool_input":{"file_path":"%s"},"tool_response":{}}' "$S9" "$A" | node "$ENGINE" receipt >/dev/null
+v=$(node "$ENGINE" verify t9; echo " exit=$?")
+echo "$v" | tr '\n' ' ' | grep -q 'TAMPERED.*13/14.*exit=1' && ok "forged row void, later receipt still valid: $v" || bad "expected TAMPERED 13/14 exit=1" "$v"
+export CLAUDE_SESSION_ID="t1"
+
 echo; echo "passed $pass failed $fail"; rm -rf "$TMP"; [ "$fail" -eq 0 ]

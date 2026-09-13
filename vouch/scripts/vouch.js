@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 /*
- * vouch engine v0.2: receipts, grounding lock, claim guard, loop monitor, bankroll, tiers, report.
+ * vouch engine v0.2.13: receipts, grounding lock, claim guard, loop monitor, bankroll, tiers, report.
  * Zero dependencies. Runs as a Claude Code hook (stdin JSON) or as a CLI.
  *
  *   node vouch.js receipt        PostToolUse | PostToolUseFailure  (all tools)
@@ -48,11 +48,19 @@ function readStdin() {
   try { const buf = fs.readFileSync(0, 'utf8'); return buf.trim() ? JSON.parse(buf) : {}; } catch (e) { return {}; }
 }
 function readJson(p, fallback) { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return fallback; } }
+function sleepMs(ms) { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch (e) { const t = Date.now() + ms; while (Date.now() < t) { /* spin */ } } }
 function writeJson(p, obj) {
   fs.mkdirSync(path.dirname(p), { recursive: true });
   const tmp = p + '.' + process.pid + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(obj, null, 2));
-  fs.renameSync(tmp, p);
+  // parallel subagents run hooks at the same moment; on Windows the rename fails with EPERM/EBUSY
+  // while another process holds the target, and a hook that throws here loses its whole update
+  for (let i = 0; ; i++) {
+    try { fs.renameSync(tmp, p); return; } catch (e) {
+      if (i >= 8 || !/EPERM|EBUSY|EACCES/.test(String(e && e.code))) { try { fs.unlinkSync(tmp); } catch (_) { /* ignore */ } throw e; }
+      sleepMs(5 * (i + 1));
+    }
+  }
 }
 function appendLine(p, obj) { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.appendFileSync(p, JSON.stringify(obj) + '\n'); }
 function readLines(p) {
@@ -93,22 +101,27 @@ function secret(c) {
     return s;
   }
 }
-// hash-chained HMAC: each receipt signs its own content AND the previous receipt's signature,
-// so a receipt cannot be forged, deleted, or reordered without breaking every later signature
+// hash-chained HMAC: each receipt signs its own content AND the signature of the receipt it was
+// chained onto, so a receipt cannot be forged or deleted without voiding everything chained on it
 function sign(c, r) { return crypto.createHmac('sha256', secret(c)).update(`${r.ts}|${r.tool}|${r.hash}|${r.prev || 'genesis'}`).digest('hex').slice(0, 16); }
 // v0.1 rows carry no prev field; they are verified with the unchained signature so an upgrade
 // mid-session does not void a live ledger. Chained rows must reference the previous signature.
 function legacySign(c, r) { return crypto.createHmac('sha256', secret(c)).update(r.ts + '|' + r.tool + '|' + r.hash).digest('hex').slice(0, 16); }
+// Parallel subagents share the session ledger and each chains onto the tail it saw, so a valid
+// ledger is a tree of signed rows, not one line (v0.2.13; before this, the first concurrent append
+// voided every later receipt and the grounding lock denied every edit for the rest of the session).
+// A row is valid when its own signature checks and its prev is the signature of an earlier valid
+// row; forging one still needs the secret, and deleting one still voids everything chained on it.
 function verifiedReceipts(c) {
   const rows = readLines(c.ledger).filter((r) => r.kind === 'receipt');
   const good = [];
-  let prev = 'genesis';
+  const sigs = new Set(['genesis']);
   let broken = null;
   for (const r of rows) {
     const legacy = r.prev === undefined;
-    const valid = legacy ? r.sig === legacySign(c, r) : (r.prev === prev && r.sig === sign(c, r));
-    if (!valid) { broken = broken || r.ts; break; }
-    good.push(r); prev = r.sig;
+    const valid = legacy ? r.sig === legacySign(c, r) : (sigs.has(r.prev) && r.sig === sign(c, r));
+    if (!valid) { broken = broken || r.ts; continue; }
+    good.push(r); sigs.add(r.sig);
   }
   return { receipts: good, broken };
 }
@@ -263,8 +276,10 @@ function cmdReceiptHook(input, event) {
   if (seenBefore(state, 'r:' + (input.tool_use_id || sha16(JSON.stringify(input.tool_input || {}) + event)))) { saveState(c, state); return; }
   const ok = event !== 'PostToolUseFailure' && !(input.tool_response && input.tool_response.is_error);
   const r = makeReceipt(input, ok);
-  const rows = readLines(c.ledger).filter((x) => x.kind === 'receipt');
-  r.prev = rows.length ? rows[rows.length - 1].sig : 'genesis';
+  // chain onto the last VALID receipt: a forged or damaged row is then simply ignored instead of
+  // becoming the parent of every honest receipt that follows it
+  const { receipts: valid } = verifiedReceipts(c);
+  r.prev = valid.length ? valid[valid.length - 1].sig : 'genesis';
   r.sig = sign(c, r);
   appendLine(c.ledger, r);
   // a shell read (cat, head, sed -n, ...) of an existing file is a read of its current content:
@@ -537,7 +552,7 @@ function autoBacking(c, state, msg) {
 
 function resolveReceipt(c, spec, state, claimText) {
   const { receipts, broken } = verifiedReceipts(c);
-  const tail = broken ? ` (ledger chain broken at ${new Date(broken).toISOString()}; later receipts are void)` : '';
+  const tail = broken ? ` (ledger holds invalid receipts since ${new Date(broken).toISOString()}; those are void)` : '';
   spec = spec.trim().replace(/^`|`$/g, '');
   if (/^none$/i.test(spec)) return { ok: false, why: 'no receipt given' };
   // compound receipts ("file:src/a.js + cmd:npm test", "cmd:x and cmd:y"): every part must resolve
@@ -796,7 +811,7 @@ function cmdVerify(args) {
   const c = ctx({ session_id: args[0] || process.env.CLAUDE_SESSION_ID, cwd: process.env.CLAUDE_PROJECT_DIR });
   const { receipts, broken } = verifiedReceipts(c);
   const total = readLines(c.ledger).filter((r) => r.kind === 'receipt').length;
-  process.stdout.write(broken ? `TAMPERED: chain breaks at ${new Date(broken).toISOString()}; ${receipts.length}/${total} receipts valid\n` : `ok: ${receipts.length}/${total} receipts valid, chain intact\n`);
+  process.stdout.write(broken ? `TAMPERED: first invalid receipt at ${new Date(broken).toISOString()}; ${receipts.length}/${total} receipts valid\n` : `ok: ${receipts.length}/${total} receipts valid, chain intact\n`);
   process.exit(broken ? 1 : 0);
 }
 // the measurement: what the session cost and what vouch did about it
