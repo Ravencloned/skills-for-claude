@@ -88,7 +88,7 @@ v0.1.0, one day of runs (2026-09-13), Sonnet, one machine (`dejavu/bench/results
 - **The skill on itself:** `dejavu/docs/RESEARCH.md`, "The skill run on itself": `PARTIAL`,
   build, 18 of 25 queries; its own search log exposed the `gh` exact-phrase bug that was fixed
   afterwards.
-- **`claude plugin eval`** (WSL2, sandboxed, `evals/results/2026-09-13T12-21-11-309Z`, $4.85):
+- **`claude plugin eval`** (WSL2, sandboxed, 2026-09-13, $4.85; eval output is kept local):
   the quick-check case passed 2 of 3 runs with the plugin and 0 of 3 without, mean score 0.75
   versus 0, delta +0.75; the failed run was a 300 s timeout with 9 queries already logged. The
   plan-mode case cannot run headlessly (no plan-mode tools in the child session) and moved to

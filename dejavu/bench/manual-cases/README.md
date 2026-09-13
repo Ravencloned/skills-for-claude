@@ -9,7 +9,8 @@ Tests the plan-mode contract: the offer is made once, a skip needs the user's ow
 `ExitPlanMode` is denied once until a report or a skip exists. Under `claude plugin eval` (2.1.270,
 2026-09-13) the child session's tool list has no `EnterPlanMode`, `ExitPlanMode` or
 `AskUserQuestion` even when they are granted with `--allow-tools`; the model says so and writes the
-plan inline, so all three graders read zero in both arms (6 of 6 runs, `evals/results/2026-09-13T12-21-11-309Z`).
+plan inline, so all three graders read zero in both arms (6 of 6 runs on 2026-09-13; eval output
+stays local, `*/evals/results/` is gitignored).
 
 Run it by hand instead: `bench/playground.sh`, then Session 1 and Session 2 of `bench/PLAYGROUND.md`,
 then `bench/evaluate.sh <playground-dir>`. Move the folder back under `evals/` when a Claude Code

@@ -79,7 +79,8 @@ a path escape), and the Bash sandbox refuses to run while `~/.docker` contains a
 Desktop's WSL integration links `contexts` and `features.json` to the Windows profile; setting
 `DOCKER_CONFIG` elsewhere is not enough, the links have to be replaced by copies for the run).
 
-First real run (`evals/results/2026-09-13T12-21-11-309Z`, 18 min, $4.85, twelve runs): the quick
+First real run (2026-09-13, 18 min, $4.85, twelve runs; eval output stays local, `*/evals/results/`
+is gitignored): the quick
 check case passed 2 of 3 with the plugin (27 and 25 turns, all four graders; the third run hit the
 300 s case timeout at 18 turns with 9 queries logged, now `timeout_seconds: 600`) and 0 of 3 without
 (the `/dejavu` command does not exist without the plugin, so the baseline ends at 0 turns): mean
