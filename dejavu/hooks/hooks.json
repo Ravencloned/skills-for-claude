@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/dejavu.js\" start", "timeout": 10 } ] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/dejavu.js\" prompt", "timeout": 10 } ] }
+    ],
+    "PreToolUse": [
+      { "matcher": "ExitPlanMode", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/dejavu.js\" gate", "timeout": 10 } ] },
+      { "matcher": "EnterPlanMode", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/dejavu.js\" enter", "timeout": 10 } ] }
+    ],
+    "PostToolUse": [
+      { "matcher": "WebFetch|WebSearch", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/dejavu.js\" receipt", "timeout": 10 } ] }
+    ]
+  }
+}

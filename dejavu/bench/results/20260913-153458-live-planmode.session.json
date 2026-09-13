@@ -1,0 +1,13 @@
+{
+  "offered": true,
+  "gate_denied": true,
+  "checks": [],
+  "skip": null,
+  "seen": {
+    "p:e96bff5c-bb90-481c-a785-22159e6f8534": 1789293931556,
+    "g:live-gate-1": 1789293944024,
+    "g:live-gate-2": 1789293944285
+  },
+  "hooks_n": 4,
+  "hooks_ms": 8.130600000000001
+}

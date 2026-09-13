@@ -1,0 +1,11 @@
+{
+  "offered": true,
+  "gate_denied": false,
+  "checks": [],
+  "skip": null,
+  "seen": {
+    "p:6483d316-b7af-4fa1-a63a-fa8116f1c434": 1789293113294
+  },
+  "hooks_n": 2,
+  "hooks_ms": 3.7503
+}

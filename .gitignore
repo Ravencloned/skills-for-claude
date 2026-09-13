@@ -1,6 +1,11 @@
-.vouch/
 .claude/settings.local.json
+# vouch: runtime state, bench noise, interactive playgrounds
+.vouch/
 vouch/bench/results/*.err
-.claude/skills/vouch
 vouch/bench/results/.vouch-home/
-playground*/
+vouch/playgrounds/
+# dejavu: runtime state, bench noise, interactive playgrounds
+.dejavu/
+dejavu/bench/results/*.err
+dejavu/bench/results/*.tar
+dejavu/playgrounds/

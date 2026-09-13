@@ -1,25 +1,32 @@
 {
   "hooks": {
     "SessionStart": [
-      { "hooks": [ { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/vouch/scripts/vouch.js\" start", "timeout": 10 } ] }
+      { "hooks": [ { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/vouch/scripts/vouch.js\" start", "timeout": 10 } ] },
+      { "hooks": [ { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/dejavu/scripts/dejavu.js\" start", "timeout": 10 } ] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/dejavu/scripts/dejavu.js\" prompt", "timeout": 10 } ] }
     ],
     "PreToolUse": [
-      { "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash", "hooks": [ { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/vouch/scripts/vouch.js\" lock", "timeout": 10 } ] }
+      { "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash", "hooks": [ { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/vouch/scripts/vouch.js\" lock", "timeout": 10 } ] },
+      { "matcher": "ExitPlanMode", "hooks": [ { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/dejavu/scripts/dejavu.js\" gate", "timeout": 10 } ] },
+      { "matcher": "EnterPlanMode", "hooks": [ { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/dejavu/scripts/dejavu.js\" enter", "timeout": 10 } ] }
     ],
     "PostToolUse": [
-      { "matcher": "Bash|Read|Edit|Write|MultiEdit|NotebookEdit|Grep|Glob", "hooks": [ { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/vouch/scripts/vouch.js\" receipt", "timeout": 10 } ] }
+      { "matcher": "Bash|Read|Edit|Write|MultiEdit|NotebookEdit|Grep|Glob", "hooks": [ { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/vouch/scripts/vouch.js\" receipt", "timeout": 10 } ] },
+      { "matcher": "WebFetch|WebSearch", "hooks": [ { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/dejavu/scripts/dejavu.js\" receipt", "timeout": 10 } ] }
     ],
     "PostToolUseFailure": [
-      { "matcher": "Bash", "hooks": [ { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/vouch/scripts/vouch.js\" receipt", "timeout": 10 } ] }
+      { "matcher": "Bash", "hooks": [ { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/vouch/scripts/vouch.js\" receipt", "timeout": 10 } ] }
     ],
     "Stop": [
-      { "hooks": [ { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/vouch/scripts/vouch.js\" guard", "timeout": 10 } ] }
+      { "hooks": [ { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/vouch/scripts/vouch.js\" guard", "timeout": 10 } ] }
     ],
     "SubagentStop": [
-      { "hooks": [ { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/vouch/scripts/vouch.js\" guard", "timeout": 10 } ] }
+      { "hooks": [ { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/vouch/scripts/vouch.js\" guard", "timeout": 10 } ] }
     ],
     "TaskCompleted": [
-      { "hooks": [ { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/vouch/scripts/vouch.js\" guard", "timeout": 10 } ] }
+      { "hooks": [ { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/vouch/scripts/vouch.js\" guard", "timeout": 10 } ] }
     ]
   }
 }

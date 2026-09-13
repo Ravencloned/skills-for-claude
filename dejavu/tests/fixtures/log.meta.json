@@ -1,0 +1,25 @@
+{
+  "slug": "fx",
+  "topic": "token bucket rate limiter for an Express API",
+  "depth": "default",
+  "langs": [
+    "javascript"
+  ],
+  "project_license": "MIT",
+  "framings": {
+    "problem": "callers must not exceed N requests per second per key",
+    "mechanism": "token bucket with periodic refill",
+    "category": "rate limiter middleware"
+  },
+  "synonyms": [
+    "throttle",
+    "leaky bucket",
+    "rate limiting"
+  ],
+  "status": "open",
+  "verdict": null,
+  "recommend": null,
+  "opened": 1789293600000,
+  "reported": null,
+  "session": null
+}

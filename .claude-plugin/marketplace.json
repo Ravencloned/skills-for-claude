@@ -1,13 +1,19 @@
 {
   "name": "skills-for-claude",
   "owner": { "name": "Yash Nautiyal", "url": "https://github.com/Ravencloned" },
-  "description": "Skills that make agents pay for unforced errors in the only currency they have.",
+  "description": "Skills that make agents earn their claims: receipts before completion, prior art before building.",
   "plugins": [
     {
       "name": "vouch",
       "source": "./vouch",
       "description": "Receipts, not recall: claim guard, grounding lock, loop monitor, per-model bankroll and autonomy tiers. Zero model calls on the happy path.",
-      "version": "0.2.12"
+      "version": "0.2.13"
+    },
+    {
+      "name": "dejavu",
+      "source": "./dejavu",
+      "description": "Has anyone done this before? Tiered search of GitHub, registries, discussion sites, papers and the web before you build; a report with a verdict, closest matches and a falsifiable search log; offered automatically in plan mode and gated at ExitPlanMode until you answer.",
+      "version": "0.1.0"
     }
   ]
 }

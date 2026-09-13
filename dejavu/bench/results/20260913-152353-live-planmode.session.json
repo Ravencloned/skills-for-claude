@@ -1,0 +1,15 @@
+{
+  "offered": true,
+  "gate_denied": false,
+  "checks": [],
+  "skip": {
+    "ts": 1789293268206,
+    "reason": "well-known standard pattern (token bucket rate limiter), trivial to implement or use express-rate-limit"
+  },
+  "seen": {
+    "g:live-gate-1": 1789293427481,
+    "g:live-gate-2": 1789293427697
+  },
+  "hooks_n": 5,
+  "hooks_ms": 10.9391
+}

@@ -1,0 +1,14 @@
+source         request                               hits      ms  error
+gh-repos       query                                   10    1038  
+gh-code        query                                   10     621  
+gh-topics      query                                   10     809  
+npm            query                                   10     118  
+pypi           query                                    0    1367  RATE-LIMITED: pypi search is behind a JS client challenge; use WebSearch "site:pypi.org token bucket rate limiter" or inspect pypi:<name>
+crates         query                                   10    1082  
+hn             query                                    8     599  
+so             query                                   10     420  
+openalex       query                                   10    1386  
+arxiv          query                                    0   15007  ERROR: timeout after 15 s: https://export.arxiv.org/api/query?search_query=all%3Atoken%20AND%20all%3Abucket%20AND%20all%3Arate%20AND%20all%3Alimiter&max_results=10
+inspect        express-rate-limit/express-rate-limit     1     760  
+inspect        npm:express-rate-limit                   1     295  
+inspect        crate:governor                           1    1164  

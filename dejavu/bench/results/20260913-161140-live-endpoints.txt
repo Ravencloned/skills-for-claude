@@ -1,0 +1,14 @@
+source         request                               hits      ms  error
+gh-repos       query                                   10    1005  
+gh-code        query                                   10    9518  
+gh-topics      query                                   10     901  
+npm            query                                   10    1514  
+pypi           query                                    0     809  RATE-LIMITED: pypi search is behind a JS client challenge; use WebSearch "site:pypi.org token bucket rate limiter" or inspect pypi:<name>
+crates         query                                   10    1065  
+hn             query                                    8     761  
+so             query                                   10     720  
+openalex       query                                   10    1432  
+arxiv          query                                    0     505  RATE-LIMITED: HTTP 429 (rate-limited) from arxiv: Rate exceeded.
+inspect        express-rate-limit/express-rate-limit     1     791  
+inspect        npm:express-rate-limit                   1    1357  
+inspect        crate:governor                           1    1231  
