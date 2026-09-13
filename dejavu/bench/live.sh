@@ -111,23 +111,24 @@ fi
 # one line: a slash command followed by further paragraphs returns an empty result in -p mode
 if [ "$MODE" = "invoke" ]; then
   PROMPT='/dejavu quick token bucket rate limiter middleware for express'
-  PERM="acceptEdits"; FMT="json"; EXTRA=""
+  PERM="acceptEdits"; FMT="json"; EXTRA=""; RES="$OUT/$STAMP.json"
 elif [ "$MODE" = "planmode" ]; then
   PROMPT='Plan a token bucket rate limiter for this express app'
-  PERM="plan"; FMT="stream-json"; EXTRA="--verbose"   # stream-json lists every tool_use, so we can see whether ExitPlanMode was attempted
+  # stream-json (one JSON object per line, hence .stream.jsonl) lists every tool_use, so we can see whether ExitPlanMode was attempted
+  PERM="plan"; FMT="stream-json"; EXTRA="--verbose"; RES="$OUT/$STAMP.stream.jsonl"
 else
   echo "unknown mode: $MODE (endpoints | invoke [model] | planmode [model])"; rm -rf "$d"; exit 2
 fi
 # MSYS_NO_PATHCONV: Git Bash would otherwise rewrite a leading "/dejavu" into a Windows path
 ( cd "$d" && env -u CLAUDECODE MSYS_NO_PATHCONV=1 claude -p "$PROMPT" --model "$MODEL" --permission-mode "$PERM" --max-turns 60 --output-format "$FMT" $EXTRA \
     --allowedTools "Bash(node *),Bash(gh *),Bash(curl *),Bash(git *),Bash(cat*),Bash(ls*),Read,Edit,Write,Glob,Grep,Agent,WebSearch,WebFetch" \
-    --plugin-dir "$PLUGIN" > "$OUT/$STAMP.json" 2> "$OUT/$STAMP.err" )
-echo "exit=$? result: $OUT/$STAMP.json"
+    --plugin-dir "$PLUGIN" > "$RES" 2> "$OUT/$STAMP.err" )
+echo "exit=$? result: $RES"
 node -e '
 const fs=require("fs");const raw=fs.readFileSync(process.argv[1],"utf8").trim();let o=null;
 try{o=JSON.parse(raw)}catch{ for(const l of raw.split("\n").reverse()){try{const x=JSON.parse(l);if(x.type==="result"){o=x;break}}catch{}} }
 if(!o){console.log("no result object");process.exit(0)}
-console.log("turns",o.num_turns,"cost",o.total_cost_usd,"stop",o.stop_reason||o.subtype);console.log("--- final:");console.log(String(o.result).slice(0,900))' "$OUT/$STAMP.json"
+console.log("turns",o.num_turns,"cost",o.total_cost_usd,"stop",o.stop_reason||o.subtype);console.log("--- final:");console.log(String(o.result).slice(0,900))' "$RES"
 # state copies next to the result
 [ -d "$d/.dejavu" ] && ( cd "$d/.dejavu" && tar cf "$OUT/$STAMP.dejavu.tar" . ) 2>/dev/null
 REPORT="$(ls "$d"/docs/dejavu/*.md 2>/dev/null | head -1)"
@@ -158,15 +159,15 @@ elif [ "$MODE" = "planmode" ]; then
     cp "$SESS" "$OUT/$STAMP.session.json"
     read -r offered denied skipped < <(node -e 'const o=require(process.argv[1]);console.log(o.offered===true,o.gate_denied===true,!!o.skip)' "$SESS")
     [ "$offered" = true ] && ok "session offered: true" || bad "session offered != true" "$(cat "$SESS")"
-    if grep -q '"name":"ExitPlanMode"' "$OUT/$STAMP.json"; then
-      echo "  ExitPlanMode calls: $(grep -o '"name":"ExitPlanMode"' "$OUT/$STAMP.json" | wc -l | tr -d ' ')"
+    if grep -q '"name":"ExitPlanMode"' "$RES"; then
+      echo "  ExitPlanMode calls: $(grep -o '"name":"ExitPlanMode"' "$RES" | wc -l | tr -d ' ')"
       [ "$denied" = true ] && ok "ExitPlanMode attempted and gate_denied: true" || bad "ExitPlanMode attempted but gate_denied != true" "$(cat "$SESS")"
-      ndeny="$(grep -o 'dejavu gate: no prior-art check' "$OUT/$STAMP.json" | wc -l | tr -d ' ')"
+      ndeny="$(grep -o 'dejavu gate: no prior-art check' "$RES" | wc -l | tr -d ' ')"
       [ "$ndeny" -le 1 ] && ok "the deny reason appears at most once in the stream ($ndeny)" || bad "gate denied $ndeny times in one plan cycle"
       # after the deny the model must ask; a skip here is the model's own decision (see assert_no_skip)
-      grep -q '"name":"AskUserQuestion"' "$OUT/$STAMP.json" && echo "  info AskUserQuestion was called after the deny"
+      grep -q '"name":"AskUserQuestion"' "$RES" && echo "  info AskUserQuestion was called after the deny"
       assert_no_skip "$SESS" "$d/.dejavu/skips.jsonl"
-    elif [ "$(node -e 'const fs=require("fs");let has="unknown";for(const l of fs.readFileSync(process.argv[1],"utf8").split("\n")){try{const o=JSON.parse(l);if(o.type==="system"&&o.subtype==="init"){has=(o.tools||[]).includes("ExitPlanMode");break}}catch{}}console.log(has)' "$OUT/$STAMP.json")" = false ]; then
+    elif [ "$(node -e 'const fs=require("fs");let has="unknown";for(const l of fs.readFileSync(process.argv[1],"utf8").split("\n")){try{const o=JSON.parse(l);if(o.type==="system"&&o.subtype==="init"){has=(o.tools||[]).includes("ExitPlanMode");break}}catch{}}console.log(has)' "$RES")" = false ]; then
       # claude -p (2.1.270) lists neither ExitPlanMode nor AskUserQuestion in plan mode, so the model cannot reach the gate.
       # Drive it directly against the session state the live hooks left, with the real session id: deny once, then allow.
       SID="$(basename "$SESS" .json)"

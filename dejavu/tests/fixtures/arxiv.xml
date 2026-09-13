@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <link href="http://arxiv.org/api/query?search_query%3Dall%3Atoken%20AND%20all%3Abucket%20AND%20all%3Arate%20AND%20all%3Alimiter%26id_list%3D%26start%3D0%26max_results%3D5" rel="self" type="application/atom+xml"/>
+  <title type="html">ArXiv Query: search_query=all:token AND all:bucket AND all:rate AND all:limiter&amp;id_list=&amp;start=0&amp;max_results=5</title>
+  <id>http://arxiv.org/api/SYNTHETIC-FIXTURE-not-a-capture</id>
+  <updated>2026-09-13T00:00:00-04:00</updated>
+  <opensearch:totalResults xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">2</opensearch:totalResults>
+  <opensearch:startIndex xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">0</opensearch:startIndex>
+  <opensearch:itemsPerPage xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">5</opensearch:itemsPerPage>
+  <entry>
+    <id>http://arxiv.org/abs/0000.00001v1</id>
+    <updated>2026-03-02T09:00:00Z</updated>
+    <published>2026-03-01T09:00:00Z</published>
+    <title>Synthetic fixture: token bucket rate limiting for
+  multi-tenant APIs</title>
+    <summary>  A hand-written Atom entry in the documented arXiv API shape (SYNTHETIC, not a capture): a token bucket with
+per-tenant refill &amp; burst caps. The text is fixture filler and cites no real paper.
+</summary>
+    <author><name>Fixture Author</name></author>
+    <link href="http://arxiv.org/abs/0000.00001v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/0000.00001v1" rel="related" type="application/pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.NI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.NI" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/0000.00002v2</id>
+    <updated>2025-11-20T12:30:00Z</updated>
+    <published>2025-10-05T12:30:00Z</published>
+    <title>Synthetic fixture: fair rate limiters with leaky and token buckets</title>
+    <summary>Second hand-written entry (SYNTHETIC) so the row loop runs more than once; compares leaky-bucket and token-bucket limiters.</summary>
+    <author><name>Fixture Author</name></author>
+    <link href="http://arxiv.org/abs/0000.00002v2" rel="alternate" type="text/html"/>
+    <category term="cs.DC" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+</feed>

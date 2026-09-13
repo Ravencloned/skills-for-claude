@@ -46,21 +46,24 @@ engine refuses one without it, so the model cannot decline the check on your beh
 ## Install
 
 ```bash
-claude --plugin-dir ./dejavu                  # try it for a session
-cp -r dejavu .claude/skills/dejavu            # one project, loads as dejavu@skills-dir
-cp -r dejavu ~/.claude/skills/dejavu          # every project
-npx skills add Ravencloned/skills-for-claude  # prose only, into Codex/Cursor/Gemini/OpenCode
+claude plugin marketplace add Ravencloned/skills-for-claude   # once per machine
+claude plugin install dejavu@skills-for-claude                 # every project, updates with the version bump
+claude --plugin-dir ./dejavu                                   # or try it for one session from a clone
+npx skills add Ravencloned/skills-for-claude                   # prose only, into Codex/Cursor/Gemini/OpenCode
 ```
 
-Full instructions, the `Bash(node *)` allow rule, and the plan-mode behaviour: `dejavu/install.md`.
+Full instructions, the `Bash(node *)` allow rule, the plan-mode behaviour, and the experimental
+`.claude/skills/` copy with its loading caveats: `dejavu/install.md`.
 
 ## Results so far (honest, small n)
 
 v0.1.0, one day of runs (2026-09-13), Sonnet, one machine (`dejavu/bench/results/`):
 
-- **Battery:** `bash dejavu/tests/run.sh` ends `passed 173 failed 0` (16 groups, offline, one
-  fixture per source; the arXiv happy path is skipped because arXiv answered 429 or 503 to every
-  capture attempt that day).
+- **Battery:** `bash dejavu/tests/run.sh` ends `passed 180 failed 0` on an idle machine (16
+  groups, offline, one fixture per source; the arXiv happy path runs on a synthetic two-entry Atom
+  fixture, since arXiv answered 429 or 503 to every capture attempt that day). One run alongside
+  other engine processes ended 171/2 and two isolated re-runs 173/0 with the earlier count; the
+  shared-state case has not been identified, so treat the number as an idle-machine figure.
 - **Endpoints** (`bench/live.sh endpoints`, 16:34): eight of ten sources answered, two throttled.
 
   | source | hits | ms | note |
@@ -80,19 +83,23 @@ v0.1.0, one day of runs (2026-09-13), Sonnet, one machine (`dejavu/bench/results
   `cd` into the plugin folder.
 - **Three plan-mode runs** (`claude -p --permission-mode plan`, $0.24 to $0.66): the offer fired
   3 of 3 (session file `offered: true`). `-p` lists neither `ExitPlanMode` nor `AskUserQuestion`,
-  so the bench drives the gate with the live session id: one deny, then a silent allow, in both
-  runs where it was driven. Run 1 asked and waited. Run 2 recorded a skip nobody had asked for
-  ("well-known standard pattern") and wrote the plan; that is the failure `skip --user-said` now
-  prevents (the engine refuses a skip without the user's own words). Run 3 explored and ended its
-  turn without asking.
+  so the bench drives the gate with the live session id in runs 2 and 3. Run 1 asked and waited
+  (gate not driven). Run 2 recorded a skip nobody had asked for ("well-known standard pattern") and
+  wrote the plan, so its driven gate allowed silently on the first call, the skip having already
+  opened it (`20260913-152353-live-planmode.session.json`: `gate_denied: false`); that is the failure
+  `skip --user-said` now prevents (the engine refuses a skip without the user's own words). Run 3
+  explored and ended its turn without asking; its driven gate denied once, then allowed silently
+  (`20260913-153458-...session.json`: `gate_denied: true`).
 - **The skill on itself:** `dejavu/docs/RESEARCH.md`, "The skill run on itself": `PARTIAL`,
   build, 18 of 25 queries; its own search log exposed the `gh` exact-phrase bug that was fixed
   afterwards.
 - **`claude plugin eval`** (WSL2, sandboxed, 2026-09-13, $4.85; eval output is kept local):
   the quick-check case passed 2 of 3 runs with the plugin and 0 of 3 without, mean score 0.75
   versus 0, delta +0.75; the failed run was a 300 s timeout with 9 queries already logged. The
-  plan-mode case cannot run headlessly (no plan-mode tools in the child session) and moved to
-  `bench/manual-cases/`; the interactive playground covers it.
+  graders were tightened afterwards (only engine `query <source>` calls count, and `report` must
+  carry a slug and `--verdict`); the recorded run predates that. The plan-mode case cannot run
+  headlessly (no plan-mode tools in the child session) and moved to `bench/manual-cases/`; the
+  interactive playground covers it.
 
 What that shows, and only that: every source the engine claims either answers or fails with a
 logged reason; one real check ran end to end through log, evidence tagging, validation and a
@@ -127,5 +134,6 @@ model's summary.
 - `dejavu/tests/`, `dejavu/bench/`, `dejavu/evals/`: battery, live bench, plugin-eval cases
 - `dejavu/docs/PLAN.md`: the approved plan and build status
 - `dejavu/docs/RESEARCH.md`: prior art on this skill, the verified endpoint table, the skill run on itself
+- `dejavu/LICENSE`: MIT, copied here because a plugin install ships only this folder
 
-MIT. Third-party API terms and attributions in `dejavu/THIRD_PARTY_NOTICES.md`.
+MIT (`dejavu/LICENSE`). Third-party API terms and attributions in `dejavu/THIRD_PARTY_NOTICES.md`.

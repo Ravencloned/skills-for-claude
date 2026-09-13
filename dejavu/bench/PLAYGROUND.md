@@ -1,7 +1,9 @@
 # The playground (interactive)
 
 One small project, three roadmap features with known prior-art answers, an independent checker.
-Create it with `bash dejavu/bench/playground.sh`, open Claude Code in the created folder with
+Create it with `bash dejavu/bench/playground.sh [target-dir]` (the target is wiped and re-seeded;
+an existing directory that is not a previous atelier playground is refused unless `--force` is
+passed as the second argument), open Claude Code in the created folder with
 `claude --plugin-dir <path to dejavu>`, and run the three sessions below. Nothing in the grading
 trusts what the model says; `evaluate.sh` reads the `.dejavu/` logs.
 

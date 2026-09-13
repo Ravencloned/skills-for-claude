@@ -297,8 +297,9 @@ quick …" --plugin-dir dejavu` (with `MSYS_NO_PATHCONV=1`, `env -u CLAUDECODE`,
 and asserts a report with ≥5 query rows and only `listed|fetched` findings in the table;
 `bench/live.sh planmode [model]` runs `--permission-mode plan` and asserts `offered: true` and,
 if ExitPlanMode was called, `gate_denied: true` followed by a question or a skip.
-`evals/`: "plan mode offers the check and gates exit" and "quick check writes a report with a
-search log".
+`evals/`: "quick check writes a report with a search log". The "plan mode offers the check and
+gates exit" case lives in `bench/manual-cases/` until headless children expose the plan-mode tools
+(2.1.270 does not), and is run through the playground and graded by `bench/evaluate.sh`.
 
 ### Docs
 

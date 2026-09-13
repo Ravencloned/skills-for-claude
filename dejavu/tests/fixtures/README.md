@@ -6,22 +6,24 @@ Captured 2026-09-13 from this machine with curl 8.15.0 and gh 2.83.0 (authentica
 
 | file | bytes | capture command |
 |---|---:|---|
-| npm.json | 10062 | `curl -s "https://registry.npmjs.org/-/v1/search?text=token%20bucket%20rate%20limiter&size=10"` |
+| npm.json | 9354 | `curl -s "https://registry.npmjs.org/-/v1/search?text=token%20bucket%20rate%20limiter&size=10"` (10062 bytes as captured; maintainer and publisher `email` fields removed afterwards, see below) |
 | crates.json | 9940 | `curl -s -A "dejavu-fixture-capture" "https://crates.io/api/v1/crates?q=token%20bucket%20rate%20limiter&per_page=10"` |
 | hn.json | 29898 | `curl -s "https://hn.algolia.com/api/v1/search?query=token%20bucket%20rate%20limiter&tags=story&hitsPerPage=10"` |
 | so.json | 7403 | `curl -s --compressed "https://api.stackexchange.com/2.3/search/advanced?q=token%20bucket%20rate%20limiter&site=stackoverflow&pagesize=10"` (`--compressed`: the API always gzips; the file is plain JSON) |
 | openalex.json | 217395 | `curl -s "https://api.openalex.org/works?search=token%20bucket%20rate%20limiter&per-page=10"` |
 | arxiv-ratelimited.txt | 14 | `curl -s -L "https://export.arxiv.org/api/query?search_query=all:%22token%20bucket%22&max_results=5"` -> HTTP 429, body `Rate exceeded.` (see arXiv note) |
 | arxiv-503.html | 126 | same command, retried after 10 s / 30 s / 45 s -> HTTP 503 (see arXiv note); a last attempt at 16:30 the same day (`curl --retry 1 --retry-delay 10`) got the same 126-byte 503 and then a 446-byte Varnish "503 Request timedout" page |
+| arxiv.xml | 2395 | **synthetic, not a capture**: a hand-written Atom feed in the documented arXiv API shape (two `<entry>` blocks with id, title, summary, published, updated, links, categories; a folded title and an `&amp;` entity on purpose) so the row-building loop runs in test 7 until a real capture replaces it; every id is `0000.0000x` and every author "Fixture Author" |
 | pypi.html | 3038 | `curl -s "https://pypi.org/search/?q=token+bucket+rate+limiter"` -> HTTP 200 but a JavaScript "Client Challenge" page, not results (see PyPI note) |
+| pypi-token-bucket.json | 17847 | copy of inspect-pypi.json under the name the `pypi` source reads in fixture mode for its exact-name fallback (`query pypi "token-bucket"` -> JS challenge -> `GET https://pypi.org/pypi/token-bucket/json`) |
 | gh-repos.json | 3820 | `gh search repos "token bucket rate limiter" --limit 10 --json fullName,description,url,stargazersCount,updatedAt,license,isArchived` + one appended row (see below) |
-| gh-code.json | 1482 | `gh search code "token bucket" --limit 5 --json repository,path,url` |
+| gh-code.json | 1482 | `gh search code "token bucket" --limit 5 --json repository,path,url` (deliberately the two-word query at limit 5: code search on the full fixed phrase returned nothing) |
 | gh-topics.json | 1635 | `gh search repos --topic rate-limiter --limit 5 --json fullName,description,url,stargazersCount,updatedAt,license,isArchived` (captured 16:20; the camelCase array the engine's `gh-topics` source runs) |
 | gh-topics-rest.json | 28219 | `gh api "search/repositories?q=topic:rate-limiter&per_page=5"` (the REST shape; same five repos, see below) |
 | inspect-github.json | 7515 | `gh api repos/express-rate-limit/express-rate-limit` |
-| inspect-npm.json | 461272 | `curl -s "https://registry.npmjs.org/express-rate-limit"` (full packument, every version) |
+| inspect-npm.json | 446723 | `curl -s "https://registry.npmjs.org/express-rate-limit"` (full packument, every version; 461272 bytes as captured, `email` and `_npmUser` fields removed afterwards) |
 | inspect-crates.json | 44972 | `curl -s -A "dejavu-fixture-capture" "https://crates.io/api/v1/crates/governor"` |
-| recheck/npm.json | 10662 | copy of npm.json with one **fabricated** package object `zz-new-since-report` prepended to `objects[]` (`total` +1) |
+| recheck/npm.json | 9886 | copy of npm.json with one **fabricated** package object `zz-new-since-report` prepended to `objects[]` (`total` +1); same e-mail strip |
 | recheck/gh-repos.json | 4171 | copy of gh-repos.json with one **fabricated** repo `zz-new/zz-new-since-report` (updatedAt 2026-09-13T00:00:00Z) prepended |
 | fetch.html | 559 | `curl -s "https://example.com/"` (what `fetch <url>` and `inspect <url>` read: any real HTML page with a `<title>`) |
 | inspect-npm-downloads.json | 94 | `curl -s "https://api.npmjs.org/downloads/point/last-month/express-rate-limit"` (read by `inspect npm:<name>` next to inspect-npm.json) |
@@ -31,6 +33,13 @@ Captured 2026-09-13 from this machine with curl 8.15.0 and gh 2.83.0 (authentica
 | log.meta.json | 555 | the `.dejavu/checks/<slug>.json` that belongs to log.jsonl (slug `fx`); generated the same way |
 
 ## Notes
+
+**The npm fixtures carry no e-mail addresses.** The registry returns maintainers' and publishers'
+addresses (`maintainers[].email`, `publisher.email`, `_npmUser`); the engine never reads them, and a
+public repository has no reason to redistribute them, so they were deleted from npm.json,
+recheck/npm.json and inspect-npm.json after capture (344 fields; the JSON was re-serialized compact,
+as the registry sends it, with every other field and its order intact). Re-captures must repeat the
+strip: `node -e` over the file deleting every `email` string and every `_npmUser` object.
 
 **gh-repos.json is 10 real search rows plus one appended real row.** The live search did not return
 `express-rate-limit/express-rate-limit`, which the `evidence: listed` test and `bench/live.sh` inspect against, so its row was
@@ -48,11 +57,12 @@ archived`), which is also what keyless api.github.com returns when `gh` is absen
 parses the camelCase file in its source loop and the REST file through a temporary fixture dir, and asserts the same five names.
 `log.jsonl` row 6 (`gh-topics`, 5 hits) was generated from the REST capture; its `top[]` matches either file.
 
-**arXiv: no successful capture.** Six calls over about four minutes (3 s spacing, then 10 s, 30 s and 45 s waits) all
-returned 429 `Rate exceeded.` or a 503 HTML page; the host was throttling this IP (the plan already notes arXiv throttles).
-The two real error bodies are kept so the `arxiv` parser can be tested on the failure path (error row, exit 0). A real
-Atom feed `arxiv.xml` must be captured later with the same command once the throttle lifts; `tests/run.sh` should skip the
-arxiv happy-path case while that file is absent. Note the http:// form of the URL answers 301 with an empty body, so use
+**arXiv: no successful capture; arxiv.xml is synthetic.** Six calls over about four minutes (3 s spacing, then 10 s, 30 s
+and 45 s waits) all returned 429 `Rate exceeded.` or a 503 HTML page; the host was throttling this IP (the plan already
+notes arXiv throttles). The two real error bodies are kept so the `arxiv` parser can be tested on the failure path (error
+row, exit 0). `arxiv.xml` is a hand-written two-entry feed in the documented Atom shape so the happy path (the `<entry>`
+loop: title fold, entity decoding, `updated` over `published`, summary truncation) runs in test 7 at all; replace it with a
+real capture using the same command once the throttle lifts and keep the table row honest about which it is. Note the http:// form of the URL answers 301 with an empty body, so use
 https:// (or `-L`). `tests/run.sh` serves arxiv-ratelimited.txt as `arxiv.xml` from a temporary fixture dir to prove the
 error path (test 7, test 13) and runs the happy-path case automatically once a real `arxiv.xml` exists here. Live finding
 (2026-09-13, `bench/live.sh endpoints` and a curl/Node A/B): while throttling, arXiv either answers 429 `Rate exceeded.` within
@@ -101,8 +111,9 @@ rows and nothing else. Regenerate by replaying the commands above in a scratch p
 `query` calls, one `receipt` with a WebSearch payload, `inspect`, three `log finding`, `log note`), then rewrite `ts` and set
 `slug` to `fx` in the meta; a parser change that alters `top[]` means regenerating, and test 10's literal assertions say which.
 On 2026-09-13 four `request` strings and one `source` were rewritten in place to the engine's current format rather than
-regenerating: rows 4 and 5 (gh-repos, gh-code) now show each word as a separate gh term, rows 9 and 13 (pypi, arxiv: errored)
-carry the URL that was attempted, and the `meta` row 16 says `source: "gh-repos"` (an inspect of a GitHub repo).
+regenerating: rows 4 and 5 (gh-repos, gh-code) now show the gh command with its flags first and each word as a separate
+term after `--`, rows 9 and 13 (pypi, arxiv: errored) carry the URL that was attempted, and the `meta` row 16 says
+`source: "gh-repos"` (an inspect of a GitHub repo).
 
 **Re-capture** by running the commands in the table from this directory; keep `-A "dejavu-fixture-capture"` for crates.io
 (its policy requires a User-Agent) and `--compressed` for StackExchange.

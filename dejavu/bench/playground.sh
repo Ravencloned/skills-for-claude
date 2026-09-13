@@ -20,6 +20,10 @@ set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN="$(cd "$HERE/.." && pwd)"
 D="${1:-$HERE/../playgrounds/atelier}"
+# the target is replaced: refuse an existing directory that is not a previous atelier playground unless --force is passed
+if [ -e "$D" ] && [ "${2:-}" != "--force" ] && ! grep -q '"name": "atelier"' "$D/package.json" 2>/dev/null; then
+  echo "playground.sh: $D exists and is not an atelier playground; pass --force as the second argument to replace it" >&2; exit 2
+fi
 rm -rf "$D"; mkdir -p "$D/src/legacy" "$D/test" "$D/docs"
 cd "$D"
 cat > package.json <<'EOF'
@@ -117,6 +121,7 @@ printf 'node_modules/\norders.json\n.dejavu/\n' > .gitignore
 
 # git history: tier 0 has to be able to find the unfinished throttle with `git log -S`
 git init -q -b main
+git config core.autocrlf false   # the seed is LF: no "LF will be replaced by CRLF" warnings on Windows before the ready banner
 G="git -c user.name=teammate -c user.email=teammate@example.com"
 $G add package.json README.md src/server.js test/server.test.js .gitignore
 $G commit -q -m "atelier: orders API with a JSON store" --date="2026-05-20T10:00:00"

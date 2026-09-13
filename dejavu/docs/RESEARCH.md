@@ -206,5 +206,5 @@ _Filled by the plan or the user: what was decided (adopt / fork / wrap / assembl
 ## Re-check
 
 ```
-node "C:/Users/Yash Nautiyal/Desktop/Skills for claude/dejavu/scripts/dejavu.js" recheck a-claude-code-skill-that-checks-whether-anyone-has-already-b
+node "C:/Users/<user>/Desktop/Skills for claude/dejavu/scripts/dejavu.js" recheck a-claude-code-skill-that-checks-whether-anyone-has-already-b
 ```

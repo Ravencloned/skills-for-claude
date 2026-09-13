@@ -13,5 +13,7 @@ plan inline, so all three graders read zero in both arms (6 of 6 runs on 2026-09
 stays local, `*/evals/results/` is gitignored).
 
 Run it by hand instead: `bench/playground.sh`, then Session 1 and Session 2 of `bench/PLAYGROUND.md`,
-then `bench/evaluate.sh <playground-dir>`. Move the folder back under `evals/` when a Claude Code
-release exposes plan-mode tools to headless children.
+then `bench/evaluate.sh <playground-dir>`. The graders here are `tool_used` and `regex` checks that
+cannot see exit codes or files; `evaluate.sh` section 2 (a skip must carry `user_said`) and its
+session checks (offered once, gated once) are the authoritative grade. Move the folder back under
+`evals/` when a Claude Code release exposes plan-mode tools to headless children.

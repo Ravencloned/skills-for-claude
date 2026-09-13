@@ -1,7 +1,7 @@
 {
   "name": "dejavu",
   "displayName": "dejavu",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Has anyone done this before? Tiered keyless search of GitHub, package registries, HN and StackOverflow, papers and the web before anything gets built; a committed report with a verdict, closest matches, a recommendation and a search log that makes a negative result falsifiable. Offers itself once in plan mode and gates ExitPlanMode until a check ran or was skipped.",
   "author": { "name": "Yash Nautiyal", "url": "https://github.com/Ravencloned" },
   "repository": "https://github.com/Ravencloned/skills-for-claude",

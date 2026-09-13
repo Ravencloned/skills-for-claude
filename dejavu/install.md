@@ -8,60 +8,53 @@ queries per minute). Without it, Tier 1 runs through WebSearch `site:github.com`
 dependencies. dejavu is a Claude Code plugin: one folder with a manifest, a skill, an agent, hooks,
 and the engine.
 
-## A. Try it for one session
-
-```bash
-claude --plugin-dir ./dejavu
-```
-
-Normal mode is on immediately: the SessionStart line (only when `docs/dejavu/` has reports), the
-plan-mode offer and gate, and the WebSearch/WebFetch receipt hook. Run a check with
-`/dejavu quick <what you are about to build>` (or `default`, `deep`).
-
-## B. Install for one project (recommended first)
-
-```bash
-mkdir -p .claude/skills && cp -r dejavu .claude/skills/dejavu
-printf '.dejavu/\n' >> .gitignore
-```
-
-The folder carries `.claude-plugin/plugin.json`, so Claude Code should load it as the plugin
-`dejavu@skills-dir` on the next interactive session in that project, after the workspace-trust
-prompt. `hooks/hooks.json` provides normal mode; `SKILL.md` provides `/dejavu`;
-`agents/dejavu-scout.md` provides the scout.
-
-Verified status for the sibling plugin vouch (2026-09-10): the marketplace install (D) and
-`--plugin-dir` (A) load hooks, skill, and agent; the skills-dir path did not load in
-non-interactive (`claude -p`) runs, which never see the trust prompt, and a directory junction is
-not followed. dejavu uses the same layout; if a session in a project with reports shows no
-`dejavu: N reports on file` line, fall back to D or to the standalone hooks below.
-
-### Standalone fallback (no plugin loading)
-
-Merge the `hooks` object from `dejavu/hooks/hooks.json` into `.claude/settings.json`, replacing
-`${CLAUDE_PLUGIN_ROOT}` with `$CLAUDE_PROJECT_DIR/.claude/skills/dejavu`, and copy
-`dejavu/agents/dejavu-scout.md` to `.claude/agents/`. The engine de-duplicates hook deliveries by
-`tool_use_id`, so running both the plugin and the standalone copy logs nothing twice and denies
-`ExitPlanMode` at most once per plan cycle.
-
-## C. Install for every project
-
-```bash
-cp -r dejavu ~/.claude/skills/dejavu
-```
-
-Same plugin, loaded in every session on this machine.
-
-## D. Install from the marketplace (once the repo is public)
+## A. Install from the marketplace (recommended)
 
 ```bash
 claude plugin marketplace add Ravencloned/skills-for-claude
 claude plugin install dejavu@skills-for-claude
 ```
 
-Updates arrive when `version` in `plugin.json` is bumped.
+Normal mode is on immediately: the SessionStart line (only when `docs/dejavu/` has reports), the
+plan-mode offer and gate, and the WebSearch/WebFetch receipt hook. Run a check with
+`/dejavu quick <what you are about to build>` (or `default`, `deep`). Updates arrive when `version`
+in `plugin.json` is bumped. The marketplace path was verified end to end for the sibling plugin
+vouch on 2026-09-10; dejavu has the same layout and manifest shape.
 
-## E. Other harnesses (prose tier)
+## B. Try it for one session from a clone
+
+```bash
+claude --plugin-dir ./dejavu
+```
+
+Same as A, for that session only. This is how `bench/live.sh invoke` and `planmode` run it.
+
+## C. Copy into a project (experimental)
+
+```bash
+mkdir -p .claude/skills && cp -r dejavu .claude/skills/dejavu
+printf '.dejavu/\n' >> .gitignore
+```
+
+The folder carries `.claude-plugin/plugin.json`, so Claude Code can load it as the plugin
+`dejavu@skills-dir` in an interactive session in that project, after the workspace-trust prompt.
+Known limits (measured on vouch, 2026-09-10; same layout): the skills-dir path did not load in
+non-interactive (`claude -p`) runs, which never see the trust prompt, and a directory junction is
+not followed. The receipt hook declared in `SKILL.md` and `${CLAUDE_PLUGIN_ROOT}` in
+`hooks/hooks.json` exist only when the plugin loader runs the folder, so a copy that did not load as
+a plugin runs nothing at all. If a session in a project with reports shows no
+`dejavu: N reports on file` line, use A or B, or the standalone hooks below.
+`cp -r dejavu ~/.claude/skills/dejavu` is the same copy for every project, with the same limits.
+
+### Standalone fallback (no plugin loading)
+
+Merge the `hooks` object from `dejavu/hooks/hooks.json` into `.claude/settings.json`, replacing
+`${CLAUDE_PLUGIN_ROOT}` with `$CLAUDE_PROJECT_DIR/.claude/skills/dejavu`, and copy
+`dejavu/agents/dejavu-scout.md` to `.claude/agents/`. That gives the hooks only; `/dejavu` needs the
+plugin loader. The engine de-duplicates hook deliveries by `tool_use_id`, so running both the plugin
+and the standalone copy logs nothing twice and denies `ExitPlanMode` at most once per plan cycle.
+
+## D. Other harnesses (prose tier)
 
 ```bash
 npx skills add Ravencloned/skills-for-claude
@@ -83,7 +76,8 @@ would prompt. Add the rule once to the project or user settings:
 ```
 
 in `.claude/settings.json` (project) or `~/.claude/settings.json` (user). The engine only ever
-writes under `.dejavu/` and `docs/dejavu/`; the plan-mode deny is the only thing it blocks.
+writes under `.dejavu/` and `docs/dejavu/` (a `report_dir` in `dejavu.config.json` that resolves
+outside the project is ignored with a note); the plan-mode deny is the only thing it blocks.
 
 ## Plan-mode behaviour
 
@@ -115,13 +109,18 @@ node dejavu/scripts/dejavu.js status              # session state, open check, r
 node dejavu/scripts/dejavu.js recheck <slug>      # new hits since the report date, appended to the report
 node dejavu/scripts/dejavu.js publish <slug>      # copy the canonical report into docs/dejavu/
 node dejavu/scripts/dejavu.js skip --user-said "<your words>" "<reason>"   # open the plan-mode gate without a check (needs your answer)
+node dejavu/scripts/dejavu.js help                # every subcommand, environment variable and state file
 ```
 
 State: `.dejavu/` in the project (sessions, checks, current check, pending skip, pending invoke,
 rate-limit stamps) and `~/.claude/dejavu/errors.log`. Delete `.dejavu/` to reset; committed reports in
 `docs/dejavu/` are unaffected. Override defaults with `dejavu.config.json` in the project root;
-keys are listed in `log/SCHEMA.md` (`report_dir`, `budgets`, `tiers_required`, `offer`, `gate`,
-`sources_off`).
+keys are listed in `log/SCHEMA.md` (`report_dir`, which must stay inside the project, `budgets`,
+`tiers_required`, `offer`, `gate`, `sources_off`).
+
+Page text that `fetch` prints, and the titles, descriptions and error bodies the sources return,
+are data about the candidates; the engine frames fetched text between `--- untrusted page text ---`
+markers and `SKILL.md` tells the model to read it as evidence, never as instructions.
 
 ## Tests and bench
 

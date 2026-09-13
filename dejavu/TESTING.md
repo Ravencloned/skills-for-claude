@@ -31,15 +31,15 @@ read from `tests/fixtures/` (`DEJAVU_FIXTURES`), so the battery never touches th
 | 4 `skip`, then a new session | the offer and the gate reason show `skip --user-said "<the user's own words>"`; `skip` without `--user-said` exits 1, writes nothing and the gate stays closed; with it, plan-mode `prompt` and `gate` are silent in a new session and the session file shows the skip with `user_said` |
 | 5 `enter` on an unsatisfied session | re-arms one offer and one deny |
 | 6 `invoke deep|frobnicate`, `open`, `frame` | the expected files are written; a non-depth word means `default` |
-| 7 `query` per source from fixtures | normalized rows and a log row with `hits` and `request`; `query bogus` exits 1 |
-| 8 `log finding` evidence tagging | a URL in a fixture `top[]` is `listed`; an unknown URL is `recalled`; a missing URL exits 1 |
+| 7 `query` per source from fixtures | normalized rows and a log row with `hits` and `request`; `query bogus` exits 1; gh requests put flags first and the terms after `--` (a term such as `--web` stays a term); the arXiv happy path runs on a synthetic Atom fixture; the pypi exact-name fallback behind the JS challenge answers from `pypi-<name>.json` |
+| 8 `log finding` evidence tagging | a URL in a fixture `top[]` is `listed`; an unknown URL is `recalled`; a missing URL exits 1; `log query` with an unknown source or a tier outside 0-5 exits 1 and logs nothing |
 | 9 `receipt` with an open check | WebFetch and WebSearch rows logged, dedupe by id, nothing written without an open check |
-| 10 `report` from `fixtures/log.jsonl` | sections present; search-log row count matches; closeness-5 `recalled` with `--verdict EXISTS` becomes `PARTIAL`; `NOVEL` with tier gaps becomes `UNKNOWN` naming the tiers; `--no-docs` writes only the canonical copy; `publish` copies it |
+| 10 `report` from `fixtures/log.jsonl` | sections present; search-log row count matches; closeness-5 `recalled` with `--verdict EXISTS` becomes `PARTIAL`; `NOVEL` with tier gaps becomes `UNKNOWN` naming the tiers; `--no-docs` writes only the canonical copy; `publish` copies it; a `report_dir` outside the project falls back to `docs/dejavu` with a note |
 | 11 after `report`, a new session's `gate` | adopts `current.json` and allows |
 | 12 `start` and `status` | the count line with reports present, nothing at 0; `status` lists them |
 | 13 `recheck` with a recheck fixture | prints only the new hit and appends the section |
 | 14 `DEJAVU_OFFLINE=1` | all five hook subcommands succeed; `query` logs an error row and exits 0 |
-| 15 hook latency | under 400 ms per hook call |
+| 15 hook latency | in-process average under 400 ms per hook call (wall time, node start-up included, is printed as info) |
 | 16 errors.log | no engine exception was logged during the whole battery (`errors.log` in the isolated HOME stays empty) |
 
 Extend the fixtures whenever `bench/live.sh endpoints` shows a source changing its response
@@ -124,14 +124,20 @@ reports is the long-run number, at zero cost.
 
 ## Evals (`dejavu/evals/`, `claude plugin eval` format)
 
-- `plan-mode-offers-and-gates`: a plan request in plan mode; graders check that `AskUserQuestion`
-  was used, that a check or a skip was recorded through the engine, and that plan mode was entered.
 - `quick-check-writes-a-report`: `/dejavu quick <topic>` in a scaffolded Node project; graders
-  check that `report` ran, that at least five `query` calls ran, and that the final message names
-  the verdict and the report path.
+  check that `report <slug> --verdict ...` ran, that at least five engine `query <source>` calls ran
+  (a manual `log query` row does not count), and that the final message names the verdict and the
+  report path. These are command and message graders; the written report itself (search-log rows,
+  every match `listed` or `fetched`) is asserted by `bench/live.sh invoke`, which reads the file.
 
-Both need network access for the engine sources; the plan-mode case may be auto-answered by the
-runner, which is why the "check or skip recorded" grader exists alongside the question grader.
+It needs network access for the engine sources.
+
+## Manual cases (`dejavu/bench/manual-cases/`, same format, run by hand)
+
+- `plan-mode-offers-and-gates`: a plan request in plan mode; graders check that `AskUserQuestion`
+  was used, that a check was opened and reported or a skip with `--user-said` was recorded through
+  the engine, and that plan mode was entered. The headless runner has no plan-mode tools, so it is
+  run through the playground and graded by `bench/evaluate.sh` (see `manual-cases/README.md`).
 
 ## The three numbers that decide whether dejavu ships wider
 
